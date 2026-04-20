@@ -311,10 +311,188 @@ function deduplicateEvents(events) {
   });
 }
 
-function matchesConflictKeywords(item, keywords) {
-  if (!keywords?.length) return true;
-  const text = `${item.title} ${item.description} ${item.normalizedDescription || ""}`.toLowerCase();
-  return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+const CONFLICT_RELEVANCE = {
+  "russia-ukraine": {
+    requiredAny: [
+      "ukraine",
+      "ukrainian",
+      "kyiv",
+      "kiev",
+      "kharkiv",
+      "odesa",
+      "odessa",
+      "dnipro",
+      "zaporizh",
+      "sumy",
+      "kherson",
+      "donetsk",
+      "luhansk",
+      "crimea",
+      "donbas",
+      "pokrovsk",
+      "kupiansk",
+      "kramatorsk",
+      "sloviansk",
+      "toretsk",
+      "bakhmut",
+      "avdiivka",
+      "belgorod",
+      "kursk",
+      "taganrog"
+    ],
+    contextAny: ["russia", "russian", "drone", "missile", "shelling", "strike", "attack", "frontline", "war"]
+  },
+  "israel-gaza": {
+    requiredAny: [
+      "gaza",
+      "rafah",
+      "khan younis",
+      "deir al-balah",
+      "deir al balah",
+      "jabalia",
+      "beit hanoun",
+      "west bank",
+      "jenin",
+      "tulkarm",
+      "palestinian",
+      "palestine",
+      "hamas"
+    ],
+    contextAny: ["israel", "israeli", "idf", "strike", "raid", "shelling", "aid", "ceasefire", "hostage", "rocket"]
+  },
+  lebanon: {
+    requiredAny: [
+      "lebanon",
+      "lebanese",
+      "hezbollah",
+      "beirut",
+      "tyre",
+      "sidon",
+      "nabatieh",
+      "baalbek",
+      "bekaa",
+      "litani",
+      "blue line",
+      "southern lebanon",
+      "south lebanon"
+    ],
+    contextAny: [
+      "israel",
+      "israeli",
+      "idf",
+      "border",
+      "strike",
+      "airstrike",
+      "drone",
+      "missile",
+      "shelling",
+      "attack",
+      "clash",
+      "rocket",
+      "displacement",
+      "evacuation"
+    ]
+  },
+  "israel-iran-usa": {
+    requiredAny: [
+      "iran",
+      "iranian",
+      "tehran",
+      "isfahan",
+      "natanz",
+      "fordow",
+      "hormuz",
+      "persian gulf",
+      "gulf of oman",
+      "red sea",
+      "houthi",
+      "yemen",
+      "sanaa"
+    ],
+    contextAny: [
+      "israel",
+      "israeli",
+      "united states",
+      "u.s.",
+      "us navy",
+      "us military",
+      "missile",
+      "drone",
+      "strike",
+      "attack",
+      "retaliation",
+      "intercept",
+      "deployment"
+    ]
+  }
+};
+
+const LOW_VALUE_FEED_TERMS = [
+  "sports",
+  "entertainment",
+  "celebrity",
+  "movie",
+  "football",
+  "basketball",
+  "transfer",
+  "stock market",
+  "recipe"
+];
+
+const MARKER_ACTION_TERMS = [
+  "airstrike",
+  "strike",
+  "shelling",
+  "missile",
+  "drone",
+  "attack",
+  "clash",
+  "clashes",
+  "fighting",
+  "killed",
+  "dead",
+  "injured",
+  "explosion",
+  "blast",
+  "raid",
+  "rocket",
+  "intercept",
+  "interception",
+  "deployment",
+  "deployed",
+  "evacuation",
+  "evacuated",
+  "displacement",
+  "displaced",
+  "incursion",
+  "frontline",
+  "border fire",
+  "aid convoy",
+  "protest",
+  "unrest",
+  "sanction",
+  "pipeline",
+  "refinery",
+  "tanker"
+];
+
+function includesAny(text, terms = []) {
+  return terms.some((term) => text.includes(term));
+}
+
+function matchesConflictKeywords(item, conflict) {
+  if (conflict.id === "world-events") return true;
+
+  const text = `${item.normalizedTitle || item.title || ""} ${item.normalizedDescription || item.description || ""}`.toLowerCase();
+  const rule = CONFLICT_RELEVANCE[conflict.id];
+  if (!rule) return includesAny(text, conflict.sourceKeywords || []);
+  if (includesAny(text, LOW_VALUE_FEED_TERMS)) return false;
+
+  const hasRequiredAnchor = includesAny(text, rule.requiredAny);
+  const hasContext = includesAny(text, rule.contextAny);
+  const hasMarkerAction = includesAny(text, MARKER_ACTION_TERMS);
+
+  return hasRequiredAnchor && hasContext && hasMarkerAction;
 }
 
 async function loadStaticJson(origin, path) {
@@ -375,6 +553,11 @@ function toEvent(item, conflict, locations, index) {
   const title = item.normalizedTitle;
   const sourceLabel = item.normalizedSourceLabel;
   const description = item.normalizedDescription;
+
+  if (!matchesConflictKeywords(item, conflict)) {
+    return null;
+  }
+
   const location = findLocation(`${title} ${description}`, locations);
 
   if (!location && conflict.id === "world-events") {
@@ -528,7 +711,7 @@ export async function onRequestGet(context) {
       ...normalizePublisherRssItems(
         publisherItems,
         conflict.maxAgeHours || 24
-      ).filter((item) => matchesConflictKeywords(item, conflict.sourceKeywords)),
+      ),
       ...(gdeltResult.ok
         ? normalizeGdeltItems(
             gdeltResult.value,
@@ -539,7 +722,7 @@ export async function onRequestGet(context) {
 
     const locations = [
       ...(locationsMap[conflict.id] || []),
-      ...(conflict.id === "world-events" ? [] : locationsMap["world-events"] || [])
+      ...(conflict.id === "world-events" ? locationsMap["world-events"] || [] : [])
     ];
     const events = deduplicateEvents(
       items

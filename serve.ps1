@@ -323,6 +323,11 @@ function Convert-RssItemToEvent {
   $rawTitle = [string]$Item.title
   $description = Strip-Html -Text ([string]$Item.description)
   $combinedText = "$rawTitle $description"
+
+  if (-not (Test-ConflictRelevance -Item $Item -Conflict $Conflict)) {
+    return $null
+  }
+
   $location = Get-MatchedLocation -Text $combinedText -Locations $Locations
 
   if ($null -eq $location) {
@@ -376,6 +381,66 @@ function Deduplicate-Events {
   }
 
   return $results
+}
+
+function Test-IncludesAny {
+  param(
+    [string]$Text,
+    [string[]]$Terms
+  )
+
+  foreach ($term in $Terms) {
+    if ($Text.Contains($term)) {
+      return $true
+    }
+  }
+
+  return $false
+}
+
+function Test-ConflictRelevance {
+  param(
+    [object]$Item,
+    [object]$Conflict
+  )
+
+  if ($Conflict.id -eq "world-events") {
+    return $true
+  }
+
+  $title = if ($Item.PSObject.Properties["normalizedTitle"]) { [string]$Item.normalizedTitle } else { [string]$Item.title }
+  $description = if ($Item.PSObject.Properties["normalizedDescription"]) { [string]$Item.normalizedDescription } else { [string]$Item.description }
+  $text = "$title $description".ToLowerInvariant()
+  $lowValueTerms = @("sports", "entertainment", "celebrity", "movie", "football", "basketball", "transfer", "stock market", "recipe")
+  $markerActionTerms = @("airstrike", "strike", "shelling", "missile", "drone", "attack", "clash", "clashes", "fighting", "killed", "dead", "injured", "explosion", "blast", "raid", "rocket", "intercept", "interception", "deployment", "deployed", "evacuation", "evacuated", "displacement", "displaced", "incursion", "frontline", "border fire", "aid convoy", "protest", "unrest", "sanction", "pipeline", "refinery", "tanker")
+
+  if (Test-IncludesAny -Text $text -Terms $lowValueTerms) {
+    return $false
+  }
+
+  switch ($Conflict.id) {
+    "russia-ukraine" {
+      $required = @("ukraine", "ukrainian", "kyiv", "kiev", "kharkiv", "odesa", "odessa", "dnipro", "zaporizh", "sumy", "kherson", "donetsk", "luhansk", "crimea", "donbas", "pokrovsk", "kupiansk", "kramatorsk", "sloviansk", "toretsk", "bakhmut", "avdiivka", "belgorod", "kursk", "taganrog")
+      $context = @("russia", "russian", "drone", "missile", "shelling", "strike", "attack", "frontline", "war")
+    }
+    "israel-gaza" {
+      $required = @("gaza", "rafah", "khan younis", "deir al-balah", "deir al balah", "jabalia", "beit hanoun", "west bank", "jenin", "tulkarm", "palestinian", "palestine", "hamas")
+      $context = @("israel", "israeli", "idf", "strike", "raid", "shelling", "aid", "ceasefire", "hostage", "rocket")
+    }
+    "lebanon" {
+      $required = @("lebanon", "lebanese", "hezbollah", "beirut", "tyre", "sidon", "nabatieh", "baalbek", "bekaa", "litani", "blue line", "southern lebanon", "south lebanon")
+      $context = @("israel", "israeli", "idf", "border", "strike", "airstrike", "drone", "missile", "shelling", "attack", "clash", "rocket", "displacement", "evacuation")
+    }
+    "israel-iran-usa" {
+      $required = @("iran", "iranian", "tehran", "isfahan", "natanz", "fordow", "hormuz", "persian gulf", "gulf of oman", "red sea", "houthi", "yemen", "sanaa")
+      $context = @("israel", "israeli", "united states", "u.s.", "us navy", "us military", "missile", "drone", "strike", "attack", "retaliation", "intercept", "deployment")
+    }
+    default {
+      return $true
+    }
+  }
+
+  return (Test-IncludesAny -Text $text -Terms $required) -and (Test-IncludesAny -Text $text -Terms $context) -and (Test-IncludesAny -Text $text -Terms $markerActionTerms)
 }
 
 function Get-SituationTopic {
@@ -612,7 +677,10 @@ function Get-LiveFeed {
 
     foreach ($item in $items | Select-Object -First 90) {
       $index += 1
-      $events += Convert-RssItemToEvent -Item $item -Conflict $Conflict -Locations $locations -Index $index
+      $event = Convert-RssItemToEvent -Item $item -Conflict $Conflict -Locations $locations -Index $index
+      if ($null -ne $event) {
+        $events += $event
+      }
     }
 
     $events = Deduplicate-Events -Events $events
