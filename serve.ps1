@@ -238,9 +238,18 @@ function Get-MatchedLocation {
       $pattern = "(^|[^a-z])$([regex]::Escape($normalizedKeyword))([^a-z]|$)"
 
       if ($haystack -match $pattern) {
+        $explicitIncidentAnchor = $haystack -match "\b(in|near|at|over|around|outside|inside|across)\s+(the\s+)?$([regex]::Escape($normalizedKeyword))\b"
+        $politicalSubjectAnchor = $haystack -match "\b$([regex]::Escape($normalizedKeyword))\b.{0,80}\b(election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\b|\b(election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\b.{0,80}\b$([regex]::Escape($normalizedKeyword))\b"
+        $headlineMention = $haystack.Substring(0, [Math]::Min(140, $haystack.Length)).Contains($normalizedKeyword)
+        $isCountryScale = $location.PSObject.Properties["country"] -and $location.exactness -ne "exact" -and $location.country -eq $location.name
+        $attributionPattern = "\b$([regex]::Escape($normalizedKeyword))\b.{0,50}\b($($attributionTerms -join '|'))\b|\b($($attributionTerms -join '|'))\b.{0,50}\b$([regex]::Escape($normalizedKeyword))\b"
+        $actorAttribution = $haystack -match $attributionPattern
+
         $score = $normalizedKeyword.Length
         if ($location.exactness -eq "exact") { $score += 18 }
-        if ($haystack -match "\b(in|near|at|over|around|outside|inside|across)\s+(the\s+)?$([regex]::Escape($normalizedKeyword))\b") { $score += 22 }
+        if ($headlineMention) { $score += 12 }
+        if ($explicitIncidentAnchor) { $score += 35 }
+        if ($politicalSubjectAnchor) { $score += 18 }
         $start = [Math]::Max(0, $haystack.IndexOf($normalizedKeyword) - 80)
         $length = [Math]::Min($haystack.Length - $start, $normalizedKeyword.Length + 160)
         $window = $haystack.Substring($start, $length)
@@ -250,11 +259,13 @@ function Get-MatchedLocation {
         foreach ($term in $attributionTerms) {
           if ($window.Contains($term)) { $score -= 11 }
         }
+        $militaryAssetMention = $false
         foreach ($term in $militaryAssetTerms) {
-          if ($window.Contains($term) -and $location.exactness -ne "exact" -and $haystack -notmatch "\b(in|near|at|over|around|outside|inside|across)\s+(the\s+)?$([regex]::Escape($normalizedKeyword))\b") { $score -= 35; break }
+          if ($window.Contains($term)) { $militaryAssetMention = $true; break }
         }
-        $attributionPattern = "\b$([regex]::Escape($normalizedKeyword))\b.{0,50}\b($($attributionTerms -join '|'))\b|\b($($attributionTerms -join '|'))\b.{0,50}\b$([regex]::Escape($normalizedKeyword))\b"
-        if ($haystack -match $attributionPattern) { $score -= 25 }
+        if ($isCountryScale -and -not $explicitIncidentAnchor -and ($actorAttribution -or $militaryAssetMention -or ($weakWords -contains $normalizedKeyword))) { continue }
+        if ($militaryAssetMention -and $location.exactness -ne "exact" -and -not $explicitIncidentAnchor) { $score -= 35 }
+        if ($actorAttribution) { $score -= 25 }
         if ($location.PSObject.Properties["country"] -and $normalizedKeyword -eq $location.country.ToLowerInvariant()) { $score += 4 }
         if ($weakWords -contains $normalizedKeyword) { $score -= 12 }
 
@@ -266,7 +277,7 @@ function Get-MatchedLocation {
     }
   }
 
-  if ($bestScore -ge 12) {
+  if ($bestScore -ge 18) {
     return $bestMatch
   }
 

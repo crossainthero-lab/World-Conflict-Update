@@ -226,9 +226,22 @@ function countTermProximity(haystack, keyword, terms, radius = 70) {
   return terms.reduce((count, term) => count + (window.includes(term) ? 1 : 0), 0);
 }
 
+function isCountryScaleLocation(location) {
+  return location.exactness !== "exact" && location.country === location.name;
+}
+
 function hasIncidentPreposition(haystack, keyword) {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`\\b(?:in|near|at|over|around|outside|inside|across)\\s+(?:the\\s+)?${escaped}\\b`, "i").test(haystack);
+}
+
+function hasPoliticalSubjectAnchor(haystack, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b.{0,80}\\b(?:election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\\b|\\b(?:election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\\b.{0,80}\\b${escaped}\\b`, "i").test(haystack);
+}
+
+function hasHeadlineMention(haystack, keyword) {
+  return haystack.slice(0, 140).includes(keyword);
 }
 
 function hasActorAttribution(haystack, keyword) {
@@ -252,14 +265,29 @@ function findLocation(text, locations) {
       const pattern = new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, "i");
 
       if (pattern.test(haystack)) {
+        const explicitIncidentAnchor = hasIncidentPreposition(haystack, normalizedKeyword);
+        const politicalSubjectAnchor = hasPoliticalSubjectAnchor(haystack, normalizedKeyword);
+        const actorAttribution = hasActorAttribution(haystack, normalizedKeyword);
+        const militaryAssetMention = hasMilitaryAssetNear(haystack, normalizedKeyword);
+        const weakCountryMention =
+          isCountryScaleLocation(location) &&
+          !explicitIncidentAnchor &&
+          (actorAttribution || militaryAssetMention || WEAK_LOCATION_WORDS.has(normalizedKeyword));
+
+        if (weakCountryMention) {
+          continue;
+        }
+
         let score = normalizedKeyword.length;
         if (location.exactness === "exact") score += 18;
-        if (hasIncidentPreposition(haystack, normalizedKeyword)) score += 22;
+        if (hasHeadlineMention(haystack, normalizedKeyword)) score += 12;
+        if (explicitIncidentAnchor) score += 35;
+        if (politicalSubjectAnchor) score += 18;
         score += countTermProximity(haystack, normalizedKeyword, INCIDENT_TERMS) * 9;
         score -= countTermProximity(haystack, normalizedKeyword, ATTRIBUTION_TERMS) * 11;
         if (WEAK_LOCATION_WORDS.has(normalizedKeyword)) score -= 12;
-        if (location.exactness !== "exact" && hasMilitaryAssetNear(haystack, normalizedKeyword) && !hasIncidentPreposition(haystack, normalizedKeyword)) score -= 35;
-        if (hasActorAttribution(haystack, normalizedKeyword)) score -= 25;
+        if (location.exactness !== "exact" && hasMilitaryAssetNear(haystack, normalizedKeyword) && !explicitIncidentAnchor) score -= 35;
+        if (actorAttribution) score -= 25;
 
         if (score > bestScore) {
           bestScore = score;
@@ -269,7 +297,7 @@ function findLocation(text, locations) {
     }
   }
 
-  return bestScore >= 12 ? bestMatch : null;
+  return bestScore >= 18 ? bestMatch : null;
 }
 
 function deduplicateEvents(events) {
