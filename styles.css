@@ -417,10 +417,107 @@ input[type="range"] {
 }
 
 #map {
-  height: calc(100vh - 40px);
+  height: min(68vh, calc(100vh - 40px));
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow);
+}
+
+.situations-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(7, 17, 33, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.situations-panel .panel-heading {
+  align-items: flex-start;
+}
+
+.situations-panel h2,
+.timeline-panel h3 {
+  margin: 0;
+}
+
+.situations-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.situations-list,
+.timeline-list {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.situation-card {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid rgba(170, 205, 255, 0.12);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  text-align: left;
+}
+
+.situation-card:hover,
+.situation-card.active {
+  border-color: rgba(125, 249, 199, 0.45);
+  background: rgba(125, 249, 199, 0.1);
+}
+
+.situation-card strong {
+  line-height: 1.25;
+}
+
+.situation-card span,
+.situation-card small,
+.timeline-item span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.timeline-panel {
+  padding: 14px;
+  border: 1px solid rgba(170, 205, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.timeline-list {
+  margin-top: 14px;
+}
+
+.timeline-item {
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+  border-left: 2px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel-strong);
+}
+
+.timeline-item p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.timeline-item a {
+  color: var(--accent);
+  font-size: 0.82rem;
+  text-decoration: none;
 }
 
 .tactical-marker {
@@ -598,5 +695,14 @@ input[type="range"] {
 
   #map {
     height: 68vh;
+  }
+
+  .situations-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .situations-list,
+  .timeline-list {
+    max-height: none;
   }
 }

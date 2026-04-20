@@ -20,10 +20,18 @@ const hideOverlayButton = document.getElementById("hideOverlayButton");
 const showOverlayButton = document.getElementById("showOverlayButton");
 const mapOverlay = document.querySelector(".map-overlay");
 const mobileViewTabs = document.querySelector(".mobile-view-tabs");
+const situationCount = document.getElementById("situationCount");
+const situationsStatus = document.getElementById("situationsStatus");
+const situationsList = document.getElementById("situationsList");
+const timelineTitle = document.getElementById("timelineTitle");
+const timelineMeta = document.getElementById("timelineMeta");
+const timelineList = document.getElementById("timelineList");
 
 let conflicts = [];
 let activeConflictId = "";
 let activeFeed = null;
+let situations = [];
+let activeSituationId = "";
 let markers = [];
 let markerLookup = new Map();
 let map;
@@ -72,6 +80,18 @@ function formatTime(isoString) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(isoString));
+}
+
+function formatRelativeTime(isoString) {
+  const deltaMs = Date.now() - Date.parse(isoString);
+  const minutes = Math.max(1, Math.round(deltaMs / 60000));
+
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  return `${Math.round(hours / 24)}d ago`;
 }
 
 function getActiveConflict() {
@@ -375,6 +395,100 @@ function renderEventList(events) {
     });
 }
 
+function getActiveSituation() {
+  return situations.find((situation) => situation.id === activeSituationId);
+}
+
+function renderSituationTimeline(situation) {
+  timelineList.innerHTML = "";
+
+  if (!situation) {
+    timelineTitle.textContent = "Select a situation";
+    timelineMeta.textContent = "Pick one from the list to see what has happened recently.";
+    return;
+  }
+
+  timelineTitle.textContent = situation.title;
+  timelineMeta.textContent = `${situation.locationName} | Severity ${situation.severity}/5 | ${situation.sourceCount} sources`;
+
+  situation.timeline.forEach((item) => {
+    const article = document.createElement("article");
+    const time = document.createElement("span");
+    const title = document.createElement("strong");
+    const description = document.createElement("p");
+    const source = document.createElement("a");
+
+    article.className = "timeline-item";
+    time.textContent = `${formatRelativeTime(item.reportedAt)} | ${item.sourceLabel}`;
+    title.textContent = item.title;
+    description.textContent = item.description;
+    source.href = item.sourceUrl;
+    source.target = "_blank";
+    source.rel = "noreferrer";
+    source.textContent = "Open source";
+
+    article.append(time, title, description, source);
+    timelineList.appendChild(article);
+  });
+}
+
+function selectSituation(situationId, focusMap = true) {
+  activeSituationId = situationId;
+  const situation = getActiveSituation();
+
+  situationsList.querySelectorAll(".situation-card").forEach((button) => {
+    button.classList.toggle("active", button.dataset.situationId === situationId);
+  });
+  renderSituationTimeline(situation);
+
+  if (focusMap && situation) {
+    setMobileView("map");
+    map.flyTo(situation.coords, situation.exactness === "exact" ? 6 : 4, { duration: 0.9 });
+    L.popup()
+      .setLatLng(situation.coords)
+      .setContent(
+        `<h3 class="popup-title">${situation.title}</h3><p class="popup-copy">${situation.timeline.length} timeline updates | Severity ${situation.severity}/5</p>`
+      )
+      .openOn(map);
+  }
+}
+
+function renderSituations() {
+  situationsList.innerHTML = "";
+  situationCount.textContent = String(situations.length);
+
+  if (!situations.length) {
+    situationsList.innerHTML =
+      '<p class="event-description">No automatic situations detected yet. Try refreshing later as more live reports appear.</p>';
+    renderSituationTimeline(null);
+    return;
+  }
+
+  situations.forEach((situation) => {
+    const button = document.createElement("button");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const latest = document.createElement("small");
+
+    button.type = "button";
+    button.className = "situation-card";
+    button.dataset.situationId = situation.id;
+    title.textContent = situation.title;
+    meta.textContent = `${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
+    latest.textContent = `Latest ${formatRelativeTime(situation.latestAt)}`;
+
+    button.append(title, meta, latest);
+    button.addEventListener("click", () => selectSituation(situation.id));
+    situationsList.appendChild(button);
+  });
+
+  if (!activeSituationId || !situations.some((situation) => situation.id === activeSituationId)) {
+    activeSituationId = situations[0].id;
+  }
+
+  selectSituation(activeSituationId, false);
+}
+
 function renderTabs() {
   tabsRoot.innerHTML = "";
 
@@ -469,11 +583,32 @@ async function loadFeed(focusMap = false) {
   }
 }
 
+async function loadSituations() {
+  situationsStatus.textContent = "Scanning recent news for emerging timelines.";
+
+  try {
+    const response = await fetch("./api/situations", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Situations request failed: ${response.status}`);
+    }
+
+    const payload = await response.json();
+    situations = payload.situations || [];
+    situationsStatus.textContent = payload.message || "Situations refreshed.";
+    renderSituations();
+  } catch (error) {
+    situations = [];
+    situationsStatus.textContent = `Situation scan failed: ${error.message}`;
+    renderSituations();
+  }
+}
+
 function scheduleAutoRefresh() {
   window.clearTimeout(autoRefreshTimer);
   const intervalMs = userRefreshIntervalSeconds * 1000;
   autoRefreshTimer = window.setTimeout(() => {
     loadFeed(false);
+    loadSituations();
   }, intervalMs);
 }
 
@@ -513,7 +648,10 @@ function initializeMap() {
 searchInput.addEventListener("input", () => updateView());
 severityInput.addEventListener("input", () => updateView());
 confidenceInput.addEventListener("input", () => updateView());
-refreshButton.addEventListener("click", () => loadFeed(false));
+refreshButton.addEventListener("click", () => {
+  loadFeed(false);
+  loadSituations();
+});
 sourceControls.addEventListener("click", (event) => {
   const button = event.target.closest(".source-button");
   if (!button) return;
@@ -542,7 +680,7 @@ setFeedState("pending", "Booting live intel board.");
 
 if (initializeMap()) {
   loadConflicts()
-    .then(() => loadFeed(true))
+    .then(() => Promise.all([loadFeed(true), loadSituations()]))
     .catch((error) => {
       setFeedState("error", "Failed to load app configuration.", error.message);
     });

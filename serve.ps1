@@ -319,6 +319,118 @@ function Deduplicate-Events {
   return $results
 }
 
+function Get-SituationTopic {
+  param([string]$Text)
+
+  $haystack = $Text.ToLowerInvariant()
+  if ($haystack -match "president|government|parliament|election|minister|coalition|resign|vote|political") { return "Political Crisis" }
+  if ($haystack -match "border|frontier|incursion|cross-border|territory") { return "Border Crisis" }
+  if ($haystack -match "military|troop|deployment|army|defence|defense|mobilisation|mobilization") { return "Military Escalation" }
+  if ($haystack -match "drone|uav|missile|rocket|intercept|air defence|air defense") { return "Drone And Missile Activity" }
+  if ($haystack -match "attack|strike|airstrike|bombing|explosion|blast|raid|shelling") { return "Attack Timeline" }
+  if ($haystack -match "sanction|embargo|tariff|asset freeze|blacklist") { return "Sanctions Pressure" }
+  if ($haystack -match "protest|riot|unrest|demonstration|clashes|police") { return "Civil Unrest" }
+  return "Developing Situation"
+}
+
+function Get-SituationsFeed {
+  $cachePath = Join-Path $cacheRoot "situations.json"
+  if (Test-Path -LiteralPath $cachePath) {
+    $cached = Read-JsonFile -Path $cachePath
+    $cacheAge = (Get-Date) - [datetime]$cached.lastFetchedAt
+    if ($cacheAge.TotalMinutes -lt 10) {
+      return $cached
+    }
+  }
+
+  try {
+    $locations = Get-ConflictLocations -ConflictId "world-events"
+    $query = "(war OR conflict OR crisis OR military OR strike OR drone OR missile OR protest OR sanctions OR border OR election OR government OR president OR parliament OR attack) when:2d"
+    $items = Filter-RecentRssItems -Items (Get-GoogleNewsRssItems -Query $query) -MaxAgeHours 48
+    $groups = @{}
+
+    foreach ($item in $items | Select-Object -First 60) {
+      $rawTitle = [string]$item.title
+      $description = Strip-Html -Text ([string]$item.description)
+      $text = "$rawTitle $description"
+      $location = Get-MatchedLocation -Text $text -Locations $locations
+      if ($null -eq $location) { continue }
+
+      $topic = Get-SituationTopic -Text $text
+      if ($topic -eq "Developing Situation" -and (Get-SeverityScore -Text $text) -lt 3) { continue }
+
+      $sourceLabel = "Google News"
+      $title = $rawTitle
+      if ($rawTitle -match "^(.*) - ([^-]+)$") {
+        $title = $matches[1].Trim()
+        $sourceLabel = $matches[2].Trim()
+      }
+
+      $key = "$($location.name)|$topic"
+      if (-not $groups.ContainsKey($key)) {
+        $groups[$key] = [PSCustomObject]@{
+          id = ($key.ToLowerInvariant() -replace "[^a-z0-9]+", "-").Trim("-")
+          title = "$($location.name) $topic"
+          locationName = $location.name
+          coords = @([double]$location.coords[0], [double]$location.coords[1])
+          exactness = $location.exactness
+          topic = $topic
+          severity = 1
+          confidence = if ($location.exactness -eq "exact") { 4 } else { 3 }
+          sourceCount = 1
+          latestAt = [string]$item.pubDate
+          timeline = @()
+        }
+      }
+
+      $severity = Get-SeverityScore -Text "$title $description"
+      if ($severity -gt $groups[$key].severity) {
+        $groups[$key].severity = $severity
+      }
+
+      $groups[$key].timeline += [PSCustomObject]@{
+        title = $title
+        description = if ([string]::IsNullOrWhiteSpace($description)) { "Recent article mapped from Google News RSS." } else { $description.Substring(0, [Math]::Min(180, $description.Length)) }
+        reportedAt = [string]$item.pubDate
+        sourceLabel = $sourceLabel
+        sourceUrl = [string]$item.link
+        sourceType = "google-news-rss"
+        severity = $severity
+      }
+    }
+
+    $situations = @($groups.Values) |
+      ForEach-Object {
+        $_.timeline = @($_.timeline | Sort-Object { [datetimeoffset]::Parse($_.reportedAt) } -Descending | Select-Object -First 8)
+        $_.sourceCount = @($_.timeline | Select-Object -ExpandProperty sourceLabel -Unique).Count
+        $_
+      } |
+      Sort-Object severity -Descending |
+      Select-Object -First 12
+
+    $feed = [PSCustomObject]@{
+      status = if ($situations.Count -gt 0) { "live" } else { "empty" }
+      lastFetchedAt = (Get-Date).ToString("o")
+      message = "Situations generated from recent Google News RSS articles."
+      situations = $situations
+    }
+
+    $feed | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $cachePath -Encoding UTF8
+    return $feed
+  } catch {
+    if (Test-Path -LiteralPath $cachePath) {
+      return Read-JsonFile -Path $cachePath
+    }
+
+    return [PSCustomObject]@{
+      status = "error"
+      lastFetchedAt = (Get-Date).ToString("o")
+      message = "Situation scan failed: $($_.Exception.Message)"
+      situations = @()
+    }
+  }
+}
+
 function Get-LiveFeed {
   param([object]$Conflict)
 
@@ -396,6 +508,10 @@ function Handle-ApiRequest {
       }
 
       Write-JsonResponse -Response $Context.Response -Object (Get-LiveFeed -Conflict $conflict)
+      return $true
+    }
+    "/api/situations" {
+      Write-JsonResponse -Response $Context.Response -Object (Get-SituationsFeed)
       return $true
     }
     default {

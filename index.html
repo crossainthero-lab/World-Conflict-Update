@@ -140,6 +140,28 @@
         </button>
 
         <div id="map"></div>
+        <section class="situations-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Auto-Detected</p>
+              <h2>Situations</h2>
+            </div>
+            <span id="situationCount" class="badge">0</span>
+          </div>
+          <p id="situationsStatus" class="overlay-copy">
+            Scanning recent news for emerging timelines.
+          </p>
+          <div class="situations-layout">
+            <div id="situationsList" class="situations-list"></div>
+            <div class="timeline-panel">
+              <h3 id="timelineTitle">Select a situation</h3>
+              <p id="timelineMeta" class="debug-detail">
+                Pick one from the list to see what has happened recently.
+              </p>
+              <div id="timelineList" class="timeline-list"></div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
