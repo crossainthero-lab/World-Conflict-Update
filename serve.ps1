@@ -129,10 +129,11 @@ function Get-SeverityScore {
   param([string]$Text)
 
   $haystack = $Text.ToLowerInvariant()
-  if ($haystack -match "killed|dead|fatal|missile|airstrike|bombing|explosion") { return 5 }
-  if ($haystack -match "drone|shelling|strike|attack|raid|blast|retaliation") { return 4 }
-  if ($haystack -match "clash|troop|military|intercept|deployment|warning") { return 3 }
-  if ($haystack -match "aid|ceasefire|evacuation|humanitarian|talks") { return 2 }
+  if ($haystack -match "congress|senate|house committee|hearing|bill|resolution|lawmakers" -and $haystack -notmatch "attack|strike|killed|dead|fatal|protest|sanction|oil|pipeline|missile|drone|border|troop|deployment|assassinat") { return 1 }
+  if ($haystack -match "nuclear|nuke|assassinat|massacre|mass casualty|hundreds killed|chemical weapon") { return 5 }
+  if ($haystack -match "killed|dead|fatal|airstrike|bombing|explosion|missile strike|major attack") { return 4 }
+  if ($haystack -match "missile|drone|shelling|strike|attack|raid|blast|retaliation|clash|troop|military|intercept|deployment|warning") { return 3 }
+  if ($haystack -match "aid|ceasefire|evacuation|humanitarian|talks|sanction|protest|election|government|president|parliament|oil|pipeline|refinery|tanker") { return 2 }
   return 1
 }
 
@@ -173,6 +174,16 @@ function Get-GoogleNewsRssItems {
   $response = Invoke-WebRequest -Uri $url -Headers @{ "User-Agent" = "ConflictAtlasLocalhost/0.1 (+localhost)" }
   [xml]$rss = $response.Content
   return @($rss.rss.channel.item)
+}
+
+function Get-GoogleQueries {
+  param([object]$Conflict)
+
+  if ($Conflict.PSObject.Properties["rssQueries"] -and $Conflict.rssQueries.Count -gt 0) {
+    return @($Conflict.rssQueries | Select-Object -First 12)
+  }
+
+  return @($Conflict.rssQuery)
 }
 
 function Get-PublishedTimestamp {
@@ -323,6 +334,7 @@ function Get-SituationTopic {
   param([string]$Text)
 
   $haystack = $Text.ToLowerInvariant()
+  if ($haystack -match "oil|pipeline|refinery|tanker|fuel|gas|lng|energy|crude") { return "Oil And Energy" }
   if ($haystack -match "president|government|parliament|election|minister|coalition|resign|vote|political") { return "Political Crisis" }
   if ($haystack -match "border|frontier|incursion|cross-border|territory") { return "Border Crisis" }
   if ($haystack -match "military|troop|deployment|army|defence|defense|mobilisation|mobilization") { return "Military Escalation" }
@@ -331,6 +343,16 @@ function Get-SituationTopic {
   if ($haystack -match "sanction|embargo|tariff|asset freeze|blacklist") { return "Sanctions Pressure" }
   if ($haystack -match "protest|riot|unrest|demonstration|clashes|police") { return "Civil Unrest" }
   return "Developing Situation"
+}
+
+function Test-LowSignalPoliticalDocument {
+  param([string]$Text)
+
+  $haystack = $Text.ToLowerInvariant()
+  return (
+    $haystack -match "congress|senate|house committee|hearing|bill|resolution|lawmakers|subcommittee" -and
+    $haystack -notmatch "attack|strike|killed|dead|fatal|protest|sanction|oil|pipeline|missile|drone|border|troop|deployment|assassinat|coup"
+  )
 }
 
 function Get-SituationsFeed {
@@ -345,19 +367,39 @@ function Get-SituationsFeed {
 
   try {
     $locations = Get-ConflictLocations -ConflictId "world-events"
-    $query = "(war OR conflict OR crisis OR military OR strike OR drone OR missile OR protest OR sanctions OR border OR election OR government OR president OR parliament OR attack) when:2d"
-    $items = Filter-RecentRssItems -Items (Get-GoogleNewsRssItems -Query $query) -MaxAgeHours 48
+    $queries = @(
+      "(war OR conflict OR crisis OR military OR strike OR drone OR missile OR protest OR sanctions OR border OR election OR government OR president OR parliament OR attack) when:2d",
+      "Bulgaria election president government parliament Russia EU crisis when:7d",
+      "Bulgaria political crisis president election government Russia when:7d",
+      "oil pipeline refinery tanker energy crisis attack sanctions when:3d",
+      "Ukraine frontline Kherson Crimea Donetsk Luhansk Pokrovsk when:2d",
+      "Gaza aid Rafah Khan Younis Jabalia strike crisis when:2d",
+      "Iran Israel missile drone Hormuz Red Sea crisis when:3d"
+    )
+    $rssItems = @()
+    foreach ($query in $queries) {
+      try {
+        $rssItems += Get-GoogleNewsRssItems -Query $query
+      } catch {
+        Write-Warning "Situation query failed: $query"
+      }
+    }
+    $items = Filter-RecentRssItems -Items $rssItems -MaxAgeHours 168
     $groups = @{}
 
     foreach ($item in $items | Select-Object -First 60) {
       $rawTitle = [string]$item.title
       $description = Strip-Html -Text ([string]$item.description)
       $text = "$rawTitle $description"
+      if (Test-LowSignalPoliticalDocument -Text $text) { continue }
+
       $location = Get-MatchedLocation -Text $text -Locations $locations
       if ($null -eq $location) { continue }
 
       $topic = Get-SituationTopic -Text $text
-      if ($topic -eq "Developing Situation" -and (Get-SeverityScore -Text $text) -lt 3) { continue }
+      $severity = Get-SeverityScore -Text $text
+      if ($topic -eq "Developing Situation" -and $severity -lt 3) { continue }
+      if ($topic -eq "Political Crisis" -and $severity -lt 2) { continue }
 
       $sourceLabel = "Google News"
       $title = $rawTitle
@@ -383,7 +425,6 @@ function Get-SituationsFeed {
         }
       }
 
-      $severity = Get-SeverityScore -Text "$title $description"
       if ($severity -gt $groups[$key].severity) {
         $groups[$key].severity = $severity
       }
@@ -445,11 +486,19 @@ function Get-LiveFeed {
 
   try {
     $locations = Get-ConflictLocations -ConflictId $Conflict.id
-    $items = Filter-RecentRssItems -Items (Get-GoogleNewsRssItems -Query $Conflict.rssQuery) -MaxAgeHours $Conflict.maxAgeHours
+    $rssItems = @()
+    foreach ($query in (Get-GoogleQueries -Conflict $Conflict)) {
+      try {
+        $rssItems += Get-GoogleNewsRssItems -Query $query
+      } catch {
+        Write-Warning "Google News query failed: $query"
+      }
+    }
+    $items = Filter-RecentRssItems -Items $rssItems -MaxAgeHours $Conflict.maxAgeHours
     $events = @()
     $index = 0
 
-    foreach ($item in $items | Select-Object -First 30) {
+    foreach ($item in $items | Select-Object -First 90) {
       $index += 1
       $events += Convert-RssItemToEvent -Item $item -Conflict $Conflict -Locations $locations -Index $index
     }

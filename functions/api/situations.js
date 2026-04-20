@@ -15,16 +15,37 @@ const NEWS_FEEDS = [
   { name: "The Guardian World", url: "https://www.theguardian.com/world/rss" },
   { name: "France 24", url: "https://www.france24.com/en/rss" },
   { name: "DW News", url: "https://rss.dw.com/xml/rss-en-all" },
-  { name: "UN News", url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml" }
+  { name: "UN News", url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml" },
+  { name: "Reuters World", url: "https://feeds.reuters.com/reuters/worldNews" },
+  { name: "AP Top News", url: "https://apnews.com/hub/ap-top-news?output=rss" },
+  { name: "Sky News World", url: "https://feeds.skynews.com/feeds/rss/world.xml" },
+  { name: "CBS World", url: "https://www.cbsnews.com/latest/rss/world" },
+  { name: "ABC News International", url: "https://abcnews.go.com/abcnews/internationalheadlines" },
+  { name: "CBC World", url: "https://www.cbc.ca/cmlink/rss-world" },
+  { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" },
+  { name: "RFE/RL Ukraine", url: "https://www.rferl.org/api/zrqiteuuir" },
+  { name: "Kyiv Independent", url: "https://kyivindependent.com/news-archive/rss/" },
+  { name: "Ukrinform", url: "https://www.ukrinform.net/rss/block-lastnews" }
 ];
 
-const SITUATION_QUERY =
-  "(war OR conflict OR crisis OR military OR strike OR drone OR missile OR protest OR sanctions OR border OR election OR government OR president OR parliament OR attack) when:2d";
+const SITUATION_QUERIES = [
+  "(war OR conflict OR crisis OR military OR strike OR drone OR missile OR protest OR sanctions OR border OR election OR government OR president OR parliament OR attack) when:2d",
+  "Bulgaria election president government parliament Russia EU crisis when:7d",
+  "Bulgaria political crisis president election government Russia when:7d",
+  "oil pipeline refinery tanker energy crisis attack sanctions when:3d",
+  "Ukraine frontline Kherson Crimea Donetsk Luhansk Pokrovsk when:2d",
+  "Gaza aid Rafah Khan Younis Jabalia strike crisis when:2d",
+  "Iran Israel missile drone Hormuz Red Sea crisis when:3d"
+];
 
 const TOPICS = [
   {
+    label: "Oil And Energy",
+    keywords: ["oil", "pipeline", "refinery", "tanker", "fuel", "gas", "lng", "energy", "crude"]
+  },
+  {
     label: "Political Crisis",
-    keywords: ["president", "government", "parliament", "election", "minister", "coalition", "resign", "vote", "political"]
+    keywords: ["president", "government", "parliament", "election", "minister", "coalition", "resign", "vote", "political", "party", "opposition"]
   },
   {
     label: "Border Crisis",
@@ -93,7 +114,7 @@ function parsePublishedAt(pubDate) {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-function filterRecentItems(items, maxAgeHours = 48) {
+function filterRecentItems(items, maxAgeHours = 168) {
   const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
   const now = Date.now();
 
@@ -108,11 +129,20 @@ function filterRecentItems(items, maxAgeHours = 48) {
 
 function severityScore(text) {
   const haystack = text.toLowerCase();
-  if (/(killed|dead|fatal|missile|airstrike|bombing|explosion)/.test(haystack)) return 5;
-  if (/(drone|shelling|strike|attack|raid|blast|retaliation)/.test(haystack)) return 4;
-  if (/(clash|troop|military|intercept|deployment|warning|crisis)/.test(haystack)) return 3;
-  if (/(sanction|protest|election|government|president|parliament)/.test(haystack)) return 2;
+  if (/(congress|senate|house committee|hearing|bill|resolution|lawmakers)/.test(haystack) && !/(attack|strike|killed|dead|fatal|protest|sanction|oil|pipeline|missile|drone|border|troop|deployment|assassinat)/.test(haystack)) return 1;
+  if (/(nuclear|nuke|assassinat|massacre|mass casualty|hundreds killed|chemical weapon)/.test(haystack)) return 5;
+  if (/(killed|dead|fatal|airstrike|bombing|explosion|missile strike|major attack)/.test(haystack)) return 4;
+  if (/(missile|drone|shelling|strike|attack|raid|blast|retaliation|clash|troop|military|intercept|deployment|warning)/.test(haystack)) return 3;
+  if (/(crisis|sanction|protest|election|government|president|parliament|oil|pipeline|refinery|tanker|energy)/.test(haystack)) return 2;
   return 1;
+}
+
+function isLowSignalPoliticalDocument(text) {
+  const haystack = text.toLowerCase();
+  return (
+    /(congress|senate|house committee|hearing|bill|resolution|lawmakers|subcommittee)/.test(haystack) &&
+    !/(attack|strike|killed|dead|fatal|protest|sanction|oil|pipeline|missile|drone|border|troop|deployment|assassinat|coup)/.test(haystack)
+  );
 }
 
 function findLocation(text, locations) {
@@ -193,9 +223,9 @@ async function loadStaticJson(origin, path) {
   return response.json();
 }
 
-async function fetchGoogleNewsRss() {
+async function fetchGoogleNewsRss(query) {
   const url = new URL("https://news.google.com/rss/search");
-  url.searchParams.set("q", SITUATION_QUERY);
+  url.searchParams.set("q", query);
   url.searchParams.set("hl", "en-AU");
   url.searchParams.set("gl", "AU");
   url.searchParams.set("ceid", "AU:en");
@@ -251,11 +281,19 @@ function buildSituations(items, locations) {
 
   items.forEach((item) => {
     const text = `${item.title} ${item.description}`;
+    if (isLowSignalPoliticalDocument(text)) {
+      return;
+    }
+
     const location = findLocation(text, locations);
     if (!location) return;
 
     const topic = detectTopic(text);
-    if (topic.label === "Developing Situation" && severityScore(text) < 3) {
+    const severity = severityScore(text);
+    if (topic.label === "Developing Situation" && severity < 3) {
+      return;
+    }
+    if (topic.label === "Political Crisis" && severity < 2) {
       return;
     }
 
@@ -273,7 +311,6 @@ function buildSituations(items, locations) {
       timeline: []
     };
 
-    const severity = severityScore(text);
     group.severity = Math.max(group.severity, severity);
     group.latestAt =
       Date.parse(item.reportedAt) > Date.parse(group.latestAt)
@@ -322,10 +359,16 @@ export async function onRequestGet(context) {
   try {
     const locationsMap = await loadStaticJson(origin, "/data/locations.json");
     const worldLocations = locationsMap["world-events"] || [];
-    const [googleResult, ...publisherResults] = await Promise.all([
-      getOptionalSource("Google News", fetchGoogleNewsRss),
-      ...NEWS_FEEDS.map((feed) =>
-        getOptionalSource(feed.name, () => fetchRssFeed(feed))
+    const [googleResults, publisherResults] = await Promise.all([
+      Promise.all(
+        SITUATION_QUERIES.map((query) =>
+          getOptionalSource(`Google News: ${query}`, () => fetchGoogleNewsRss(query))
+        )
+      ),
+      Promise.all(
+        NEWS_FEEDS.map((feed) =>
+          getOptionalSource(feed.name, () => fetchRssFeed(feed))
+        )
       )
     ]);
 
@@ -335,14 +378,16 @@ export async function onRequestGet(context) {
     });
 
     const items = [
-      ...(googleResult.ok
-        ? normalizeGoogleNewsItems(parseRssItems(googleResult.value, "Google News"))
-        : []),
+      ...normalizeGoogleNewsItems(
+        googleResults.flatMap((result) =>
+          result.ok ? parseRssItems(result.value, "Google News") : []
+        )
+      ),
       ...normalizePublisherItems(publisherItems)
     ].sort((a, b) => b._publishedAt - a._publishedAt);
 
     const situations = buildSituations(items, worldLocations);
-    const failedSources = [googleResult, ...publisherResults]
+    const failedSources = [...googleResults, ...publisherResults]
       .filter((result) => !result.ok)
       .map((result) => `${result.label}: ${result.error}`);
 

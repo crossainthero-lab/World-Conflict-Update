@@ -16,7 +16,17 @@ const NEWS_FEEDS = [
   { name: "NPR World", url: "https://feeds.npr.org/1004/rss.xml" },
   { name: "France 24", url: "https://www.france24.com/en/rss" },
   { name: "DW News", url: "https://rss.dw.com/xml/rss-en-all" },
-  { name: "UN News", url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml" }
+  { name: "UN News", url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml" },
+  { name: "Reuters World", url: "https://feeds.reuters.com/reuters/worldNews" },
+  { name: "AP Top News", url: "https://apnews.com/hub/ap-top-news?output=rss" },
+  { name: "Sky News World", url: "https://feeds.skynews.com/feeds/rss/world.xml" },
+  { name: "CBS World", url: "https://www.cbsnews.com/latest/rss/world" },
+  { name: "ABC News International", url: "https://abcnews.go.com/abcnews/internationalheadlines" },
+  { name: "CBC World", url: "https://www.cbc.ca/cmlink/rss-world" },
+  { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" },
+  { name: "RFE/RL Ukraine", url: "https://www.rferl.org/api/zrqiteuuir" },
+  { name: "Kyiv Independent", url: "https://kyivindependent.com/news-archive/rss/" },
+  { name: "Ukrinform", url: "https://www.ukrinform.net/rss/block-lastnews" }
 ];
 
 function stripHtml(text) {
@@ -25,10 +35,10 @@ function stripHtml(text) {
 
 function severityScore(text) {
   const haystack = text.toLowerCase();
-  if (/(killed|dead|fatal|missile|airstrike|bombing|explosion)/.test(haystack)) return 5;
-  if (/(drone|shelling|strike|attack|raid|blast|retaliation)/.test(haystack)) return 4;
-  if (/(clash|troop|military|intercept|deployment|warning)/.test(haystack)) return 3;
-  if (/(aid|ceasefire|evacuation|humanitarian|talks)/.test(haystack)) return 2;
+  if (/(nuclear|nuke|assassinat|massacre|mass casualty|hundreds killed|chemical weapon)/.test(haystack)) return 5;
+  if (/(killed|dead|fatal|airstrike|bombing|explosion|missile strike|major attack)/.test(haystack)) return 4;
+  if (/(missile|drone|shelling|strike|attack|raid|blast|retaliation|clash|troop|military|intercept|deployment|warning)/.test(haystack)) return 3;
+  if (/(aid|ceasefire|evacuation|humanitarian|talks|sanction|protest|election|government|president|parliament|oil|pipeline|refinery|tanker)/.test(haystack)) return 2;
   return 1;
 }
 
@@ -199,6 +209,14 @@ async function fetchGoogleNewsRss(query) {
   return response.text();
 }
 
+function getGoogleQueries(conflict) {
+  const queries = Array.isArray(conflict.rssQueries) && conflict.rssQueries.length
+    ? conflict.rssQueries
+    : [conflict.rssQuery];
+
+  return queries.filter(Boolean).slice(0, 12);
+}
+
 async function fetchRssFeed(feed) {
   const response = await fetch(feed.url, {
     headers: {
@@ -343,26 +361,33 @@ export async function onRequestGet(context) {
   let payload;
 
   try {
-    const [googleResult, gdeltResult, ...publisherResults] = await Promise.all([
-      getOptionalSource("Google News", () => fetchGoogleNewsRss(conflict.rssQuery)),
+    const googleQueries = getGoogleQueries(conflict);
+    const [gdeltResult, ...sourceResults] = await Promise.all([
       getOptionalSource("GDELT DOC", () => fetchGdeltDoc(conflict.gdeltQuery, conflict.gdeltTimespan || "6h")),
+      ...googleQueries.map((query) =>
+        getOptionalSource(`Google News: ${query}`, () => fetchGoogleNewsRss(query))
+      ),
       ...NEWS_FEEDS.map((feed) =>
         getOptionalSource(feed.name, () => fetchRssFeed(feed))
       )
     ]);
+    const googleResults = sourceResults.slice(0, googleQueries.length);
+    const publisherResults = sourceResults.slice(googleQueries.length);
 
     const publisherItems = publisherResults.flatMap((result) => {
       if (!result.ok || !result.value?.text) return [];
       return parseRssItems(result.value.text, result.value.sourceName);
     });
+    const googleItems = googleResults.flatMap((result) => {
+      if (!result.ok || !result.value) return [];
+      return parseRssItems(result.value, "Google News");
+    });
 
     const items = [
-      ...(googleResult.ok
-        ? normalizeGoogleNewsItems(
-            parseRssItems(googleResult.value, "Google News"),
-            conflict.maxAgeHours || 24
-          )
-        : []),
+      ...normalizeGoogleNewsItems(
+        googleItems,
+        conflict.maxAgeHours || 24
+      ),
       ...normalizePublisherRssItems(
         publisherItems,
         conflict.maxAgeHours || 24
@@ -373,7 +398,7 @@ export async function onRequestGet(context) {
             conflict.maxAgeHours || 24
           )
         : [])
-    ].sort((a, b) => Date.parse(b.reportedAt) - Date.parse(a.reportedAt)).slice(0, 50);
+    ].sort((a, b) => Date.parse(b.reportedAt) - Date.parse(a.reportedAt)).slice(0, 120);
 
     const locations = [
       ...(locationsMap[conflict.id] || []),
@@ -389,7 +414,7 @@ export async function onRequestGet(context) {
       throw new Error("No sufficiently recent live events were returned from the RSS feed.");
     }
 
-    const failedSources = [googleResult, gdeltResult, ...publisherResults]
+    const failedSources = [gdeltResult, ...googleResults, ...publisherResults]
       .filter((result) => !result.ok)
       .map((result) => `${result.label}: ${result.error}`);
 

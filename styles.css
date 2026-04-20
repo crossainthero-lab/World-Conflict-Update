@@ -560,6 +560,11 @@ input[type="range"] {
   box-shadow: 0 0 0 8px rgba(255, 196, 107, 0.14);
 }
 
+.tactical-marker.oil {
+  background: #7db7ff;
+  box-shadow: 0 0 0 8px rgba(125, 183, 255, 0.14);
+}
+
 .tactical-marker.combat {
   background: #7df9c7;
   box-shadow: 0 0 0 8px rgba(125, 249, 199, 0.12);
@@ -580,6 +585,10 @@ input[type="range"] {
 
 .tactical-marker.drone.cluster {
   background: #ffc46b;
+}
+
+.tactical-marker.oil.cluster {
+  background: #7db7ff;
 }
 
 .tactical-marker.combat.cluster {
@@ -640,7 +649,7 @@ input[type="range"] {
     left: 0;
     right: 0;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     padding: 10px;
     border-bottom: 1px solid var(--border);
@@ -670,11 +679,22 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
-  body:not([data-mobile-view="map"]) .map-stage {
+  body[data-mobile-view="feed"] .map-stage {
     display: none;
   }
 
-  body[data-mobile-view="map"] .sidebar {
+  body[data-mobile-view="map"] .sidebar,
+  body[data-mobile-view="situations"] .sidebar {
+    display: none;
+  }
+
+  body[data-mobile-view="map"] .situations-panel {
+    display: none;
+  }
+
+  body[data-mobile-view="situations"] .map-overlay,
+  body[data-mobile-view="situations"] .overlay-dock,
+  body[data-mobile-view="situations"] #map {
     display: none;
   }
 

@@ -13,7 +13,15 @@
     "gdeltTimespan": "6h",
     "sourceKeywords": ["war", "conflict", "military", "strike", "drone", "missile", "protest", "sanctions", "border", "crisis", "attack", "explosion", "clash"],
     "refreshIntervalSeconds": 600,
-    "maxAgeHours": 24
+    "maxAgeHours": 24,
+    "rssQueries": [
+      "war conflict military strike drone missile protest sanctions border crisis attack when:2d",
+      "world military crisis attack strike drone missile when:2d",
+      "Europe security crisis sanctions military border when:2d",
+      "Middle East strike drone missile attack crisis when:2d",
+      "Africa conflict fighting coup attack crisis when:2d",
+      "Asia military border crisis missile drone when:2d"
+    ]
   },
   {
     "id": "russia-ukraine",
@@ -27,9 +35,21 @@
     "rssQuery": "Ukraine drone missile shelling bombing strike attack when:2d",
     "gdeltQuery": "(Ukraine OR Kyiv OR Kharkiv OR Odesa OR Dnipro OR Zaporizhzhia OR Sumy OR Kherson OR Donetsk OR Luhansk OR Belgorod OR Taganrog) (drone OR missile OR shelling OR bombing OR strike OR attack)",
     "gdeltTimespan": "6h",
-    "sourceKeywords": ["ukraine", "ukrainian", "kyiv", "kharkiv", "odesa", "dnipro", "zaporizhzhia", "sumy", "kherson", "donetsk", "luhansk", "belgorod", "taganrog", "crimea", "donbas", "drone", "missile", "shelling", "strike"],
+    "sourceKeywords": ["ukraine", "ukrainian", "kyiv", "kharkiv", "odesa", "dnipro", "zaporizhzhia", "zaporizhia", "sumy", "kherson", "donetsk", "luhansk", "belgorod", "taganrog", "crimea", "donbas", "pokrovsk", "kupiansk", "chuhuiv", "kramatorsk", "sloviansk", "avdiivka", "toretsk", "bakhmut", "mariupol", "melitopol", "berdiansk", "nikopol", "chernihiv", "mykolaiv", "drone", "missile", "shelling", "strike"],
     "refreshIntervalSeconds": 600,
-    "maxAgeHours": 24
+    "maxAgeHours": 24,
+    "rssQueries": [
+      "Ukraine Kherson shelling drone strike attack when:2d",
+      "Ukraine Crimea Sevastopol missile drone explosion when:2d",
+      "Ukraine Luhansk Donetsk frontline fighting shelling when:2d",
+      "Ukraine Pokrovsk Kramatorsk Sloviansk Toretsk attack when:2d",
+      "Ukraine Kharkiv Kupiansk Chuhuiv missile drone shelling when:2d",
+      "Ukraine Zaporizhzhia Nikopol Dnipro missile drone strike when:2d",
+      "Ukraine Odesa Mykolaiv Black Sea drone missile when:2d",
+      "Ukraine Sumy Chernihiv border shelling drone when:2d",
+      "Ukraine Belgorod Kursk Taganrog drone strike when:2d",
+      "Ukraine war latest frontline drone missile shelling when:2d"
+    ]
   },
   {
     "id": "israel-gaza",
@@ -45,7 +65,15 @@
     "gdeltTimespan": "6h",
     "sourceKeywords": ["gaza", "rafah", "khan younis", "deir al-balah", "deir al balah", "jabalia", "beit hanoun", "hamas", "ashkelon", "jerusalem", "tel aviv", "airstrike", "shelling", "aid"],
     "refreshIntervalSeconds": 600,
-    "maxAgeHours": 24
+    "maxAgeHours": 24,
+    "rssQueries": [
+      "Gaza City Jabalia Beit Hanoun strike shelling aid when:2d",
+      "Gaza Rafah Khan Younis airstrike shelling attack when:2d",
+      "Gaza Deir al-Balah Nuseirat aid strike shelling when:2d",
+      "Israel Gaza border rocket drone attack when:2d",
+      "West Bank Jenin Tulkarm raid clashes when:2d",
+      "Gaza aid convoy humanitarian crossing Rafah Kerem Shalom when:2d"
+    ]
   },
   {
     "id": "israel-iran-usa",
@@ -61,6 +89,14 @@
     "gdeltTimespan": "12h",
     "sourceKeywords": ["israel", "iran", "united states", "usa", "tehran", "isfahan", "natanz", "fordow", "baghdad", "damascus", "beirut", "sanaa", "hormuz", "red sea", "missile", "drone", "retaliation", "interception", "deployment"],
     "refreshIntervalSeconds": 600,
-    "maxAgeHours": 36
+    "maxAgeHours": 36,
+    "rssQueries": [
+      "Iran Israel missile drone strike retaliation when:3d",
+      "Iran Tehran Isfahan Natanz Fordow strike missile when:3d",
+      "Israel Iran United States military deployment interception when:3d",
+      "Iraq Syria Lebanon Israel Iran militia strike when:3d",
+      "Red Sea Yemen Houthi missile drone attack when:3d",
+      "Hormuz Gulf Iran US Navy deployment when:3d"
+    ]
   }
 ]

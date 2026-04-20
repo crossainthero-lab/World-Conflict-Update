@@ -46,7 +46,7 @@ function setMobileView(view) {
     button.classList.toggle("active", button.dataset.mobileView === view);
   });
 
-  if (view === "map" && map) {
+  if ((view === "map" || view === "situations") && map) {
     window.setTimeout(() => map.invalidateSize(), 80);
   }
 }
@@ -138,6 +138,10 @@ function getEventSymbol(event) {
 
   if (/drone|uav/.test(text)) {
     return { type: "drone", label: "UAV" };
+  }
+
+  if (/oil|pipeline|refinery|tanker|fuel|gas field|lng|crude/.test(text)) {
+    return { type: "oil", label: "OIL" };
   }
 
   if (/bomb|missile|airstrike|strike|explosion|blast|rocket/.test(text)) {
@@ -442,6 +446,10 @@ function selectSituation(situationId, focusMap = true) {
   renderSituationTimeline(situation);
 
   if (focusMap && situation) {
+    if (document.body.dataset.mobileView === "situations") {
+      return;
+    }
+
     setMobileView("map");
     map.flyTo(situation.coords, situation.exactness === "exact" ? 6 : 4, { duration: 0.9 });
     L.popup()

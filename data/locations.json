@@ -213,6 +213,96 @@
       "keywords": ["luhansk"]
     },
     {
+      "name": "Pokrovsk, Ukraine",
+      "coords": [48.2820, 37.1758],
+      "exactness": "exact",
+      "keywords": ["pokrovsk"]
+    },
+    {
+      "name": "Kramatorsk, Ukraine",
+      "coords": [48.7381, 37.5844],
+      "exactness": "exact",
+      "keywords": ["kramatorsk"]
+    },
+    {
+      "name": "Sloviansk, Ukraine",
+      "coords": [48.8667, 37.6167],
+      "exactness": "exact",
+      "keywords": ["sloviansk", "slovyansk"]
+    },
+    {
+      "name": "Toretsk, Ukraine",
+      "coords": [48.3944, 37.8479],
+      "exactness": "exact",
+      "keywords": ["toretsk"]
+    },
+    {
+      "name": "Bakhmut, Ukraine",
+      "coords": [48.5956, 37.9999],
+      "exactness": "exact",
+      "keywords": ["bakhmut", "artemivsk"]
+    },
+    {
+      "name": "Avdiivka, Ukraine",
+      "coords": [48.1399, 37.7426],
+      "exactness": "exact",
+      "keywords": ["avdiivka", "avdeevka"]
+    },
+    {
+      "name": "Kupiansk, Ukraine",
+      "coords": [49.7106, 37.6157],
+      "exactness": "exact",
+      "keywords": ["kupiansk", "kupyansk"]
+    },
+    {
+      "name": "Chuhuiv, Ukraine",
+      "coords": [49.8359, 36.6880],
+      "exactness": "exact",
+      "keywords": ["chuhuiv", "chuguev"]
+    },
+    {
+      "name": "Nikopol, Ukraine",
+      "coords": [47.5712, 34.3964],
+      "exactness": "exact",
+      "keywords": ["nikopol"]
+    },
+    {
+      "name": "Mykolaiv, Ukraine",
+      "coords": [46.9750, 31.9946],
+      "exactness": "exact",
+      "keywords": ["mykolaiv", "nikolaev"]
+    },
+    {
+      "name": "Chernihiv, Ukraine",
+      "coords": [51.4982, 31.2893],
+      "exactness": "exact",
+      "keywords": ["chernihiv", "chernigov"]
+    },
+    {
+      "name": "Mariupol, Ukraine",
+      "coords": [47.0971, 37.5434],
+      "exactness": "exact",
+      "keywords": ["mariupol"]
+    },
+    {
+      "name": "Melitopol, Ukraine",
+      "coords": [46.8489, 35.3653],
+      "exactness": "exact",
+      "keywords": ["melitopol"]
+    },
+    {
+      "name": "Berdiansk, Ukraine",
+      "coords": [46.7550, 36.7890],
+      "exactness": "exact",
+      "keywords": ["berdiansk", "berdyansk"]
+    },
+    {
+      "name": "Kursk Region, Russia",
+      "coords": [51.7304, 36.1926],
+      "exactness": "approximate",
+      "keywords": ["kursk"]
+    },
+    {
       "name": "Taganrog, Russia",
       "coords": [47.2362, 38.8969],
       "exactness": "exact",
