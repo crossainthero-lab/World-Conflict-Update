@@ -138,6 +138,22 @@
         <button id="showOverlayButton" class="overlay-dock" type="button" hidden>
           Focused Conflict
         </button>
+        <aside id="countryPanel" class="country-panel" hidden>
+          <button id="closeCountryPanel" class="overlay-toggle" type="button">
+            Close
+          </button>
+          <p class="eyebrow">Country Brief</p>
+          <h2 id="countryPanelTitle">Select a country</h2>
+          <p id="countryOverview" class="overlay-copy">
+            Tap any country on the map to load a quick overview and recent news.
+          </p>
+          <div id="countryFacts" class="country-facts"></div>
+          <div class="panel-heading country-news-heading">
+            <h3>Recent News</h3>
+            <span id="countryNewsBadge" class="badge">0</span>
+          </div>
+          <div id="countryNewsList" class="country-news-list"></div>
+        </aside>
 
         <div id="map"></div>
       </main>
@@ -165,6 +181,7 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

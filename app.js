@@ -20,12 +20,20 @@ const hideOverlayButton = document.getElementById("hideOverlayButton");
 const showOverlayButton = document.getElementById("showOverlayButton");
 const mapOverlay = document.querySelector(".map-overlay");
 const mobileViewTabs = document.querySelector(".mobile-view-tabs");
+const countryPanel = document.getElementById("countryPanel");
+const closeCountryPanel = document.getElementById("closeCountryPanel");
+const countryPanelTitle = document.getElementById("countryPanelTitle");
+const countryOverview = document.getElementById("countryOverview");
+const countryFacts = document.getElementById("countryFacts");
+const countryNewsBadge = document.getElementById("countryNewsBadge");
+const countryNewsList = document.getElementById("countryNewsList");
 
 let conflicts = [];
 let activeConflictId = "";
 let activeFeed = null;
 let markers = [];
 let markerLookup = new Map();
+let countryLayer;
 let map;
 let tileLayer;
 let autoRefreshTimer;
@@ -72,6 +80,11 @@ function formatTime(isoString) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(isoString));
+}
+
+function formatNumber(value) {
+  if (!value && value !== 0) return "Unknown";
+  return new Intl.NumberFormat("en-AU", { notation: "compact" }).format(value);
 }
 
 function getActiveConflict() {
@@ -375,6 +388,85 @@ function renderEventList(events) {
     });
 }
 
+function renderCountryNews(items) {
+  countryNewsList.innerHTML = "";
+  countryNewsBadge.textContent = String(items.length);
+
+  if (!items.length) {
+    countryNewsList.innerHTML =
+      '<p class="event-description">No recent country-specific articles came back from the live sources.</p>';
+    return;
+  }
+
+  items.forEach((item) => {
+    const article = document.createElement("article");
+    const source = document.createElement("span");
+    const title = document.createElement("strong");
+    const time = document.createElement("small");
+    const link = document.createElement("a");
+
+    article.className = "country-news-card";
+    source.textContent = item.sourceLabel;
+    title.textContent = item.title;
+    time.textContent = formatTime(item.reportedAt);
+    link.href = item.sourceUrl;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = "Open source";
+
+    article.append(source, title, time, link);
+    countryNewsList.appendChild(article);
+  });
+}
+
+function setCountryPanelLoading(countryName) {
+  countryPanel.hidden = false;
+  countryPanelTitle.textContent = countryName;
+  countryOverview.textContent = "Loading country brief and recent news.";
+  countryFacts.innerHTML = "";
+  countryNewsBadge.textContent = "0";
+  countryNewsList.innerHTML = '<p class="event-description">Scanning live sources...</p>';
+}
+
+async function loadCountryBrief(countryName, countryCode) {
+  setCountryPanelLoading(countryName);
+
+  try {
+    const params = new URLSearchParams({ country: countryName });
+    if (countryCode) params.set("code", countryCode);
+    const response = await fetch(`./api/country-news?${params.toString()}`, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`Country brief failed: ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const overview = payload.overview || {};
+    const factItems = [
+      `Capital: ${overview.capital || "Unknown"}`,
+      `Region: ${overview.region || "Unknown"}`,
+      `Population: ${formatNumber(overview.population)}`
+    ];
+    countryPanelTitle.textContent = payload.country || countryName;
+    countryOverview.textContent =
+      overview.summary ||
+      "Country overview loaded. Recent reporting is shown below when available.";
+    countryFacts.innerHTML = "";
+    factItems.forEach((item) => {
+      const fact = document.createElement("span");
+      fact.textContent = item;
+      countryFacts.appendChild(fact);
+    });
+    renderCountryNews(payload.news || []);
+  } catch (error) {
+    countryOverview.textContent = "Could not load the country brief right now.";
+    countryFacts.innerHTML = "";
+    countryNewsList.innerHTML = `<p class="event-description">${error.message}</p>`;
+  }
+}
+
 function renderTabs() {
   tabsRoot.innerHTML = "";
 
@@ -510,6 +602,61 @@ function initializeMap() {
   return true;
 }
 
+async function loadCountryLayer() {
+  if (!window.topojson) {
+    setFeedState(
+      "error",
+      "Country click layer did not load.",
+      "The TopoJSON map helper was blocked by the browser or network."
+    );
+    return;
+  }
+
+  try {
+    const response = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
+    if (!response.ok) {
+      throw new Error(`Country boundaries failed: ${response.status}`);
+    }
+
+    const topology = await response.json();
+    const countries = window.topojson.feature(topology, topology.objects.countries);
+
+    countryLayer = L.geoJSON(countries, {
+      style: {
+        color: "#7df9c7",
+        weight: 1,
+        opacity: 0.2,
+        fillColor: "#7df9c7",
+        fillOpacity: 0.015
+      },
+      onEachFeature: (feature, layer) => {
+        const countryName = feature.properties?.name || "Unknown country";
+        const countryCode = feature.id || "";
+
+        layer.on({
+          mouseover: () => {
+            layer.setStyle({ opacity: 0.75, fillOpacity: 0.08 });
+          },
+          mouseout: () => {
+            countryLayer.resetStyle(layer);
+          },
+          click: () => {
+            loadCountryBrief(countryName, countryCode);
+          }
+        });
+      }
+    }).addTo(map);
+
+    countryLayer.bringToBack();
+  } catch (error) {
+    setFeedState(
+      "error",
+      "Country click layer failed.",
+      error.message
+    );
+  }
+}
+
 searchInput.addEventListener("input", () => updateView());
 severityInput.addEventListener("input", () => updateView());
 confidenceInput.addEventListener("input", () => updateView());
@@ -531,6 +678,9 @@ showOverlayButton.addEventListener("click", () => {
   mapOverlay.classList.remove("collapsed");
   showOverlayButton.hidden = true;
 });
+closeCountryPanel.addEventListener("click", () => {
+  countryPanel.hidden = true;
+});
 mobileViewTabs.addEventListener("click", (event) => {
   const button = event.target.closest(".mobile-view-tab");
   if (!button) return;
@@ -541,6 +691,7 @@ setMobileView("feed");
 setFeedState("pending", "Booting live intel board.");
 
 if (initializeMap()) {
+  loadCountryLayer();
   loadConflicts()
     .then(() => loadFeed(true))
     .catch((error) => {
