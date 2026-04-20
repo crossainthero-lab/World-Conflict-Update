@@ -19,6 +19,7 @@ const refreshIntervalSelect = document.getElementById("refreshIntervalSelect");
 const hideOverlayButton = document.getElementById("hideOverlayButton");
 const showOverlayButton = document.getElementById("showOverlayButton");
 const mapOverlay = document.querySelector(".map-overlay");
+const mobileViewTabs = document.querySelector(".mobile-view-tabs");
 
 let conflicts = [];
 let activeConflictId = "";
@@ -30,6 +31,17 @@ let tileLayer;
 let autoRefreshTimer;
 let sourceFilter = "all";
 let userRefreshIntervalSeconds = Number(refreshIntervalSelect.value);
+
+function setMobileView(view) {
+  document.body.dataset.mobileView = view;
+  mobileViewTabs.querySelectorAll(".mobile-view-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.mobileView === view);
+  });
+
+  if (view === "map" && map) {
+    window.setTimeout(() => map.invalidateSize(), 80);
+  }
+}
 
 function setFeedState(state, message, detail = "") {
   feedBadge.className = `debug-badge debug-badge-${state}`;
@@ -348,6 +360,7 @@ function renderEventList(events) {
       });
 
       jumpButton.addEventListener("click", () => {
+        setMobileView("map");
         map.flyTo(event.coords, event.exactness === "exact" ? 9 : 7, { duration: 0.8 });
         const selectedMarker = markerLookup.get(event.id);
 
@@ -518,7 +531,13 @@ showOverlayButton.addEventListener("click", () => {
   mapOverlay.classList.remove("collapsed");
   showOverlayButton.hidden = true;
 });
+mobileViewTabs.addEventListener("click", (event) => {
+  const button = event.target.closest(".mobile-view-tab");
+  if (!button) return;
+  setMobileView(button.dataset.mobileView);
+});
 
+setMobileView("feed");
 setFeedState("pending", "Booting live intel board.");
 
 if (initializeMap()) {

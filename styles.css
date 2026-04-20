@@ -36,6 +36,10 @@ a {
   font: inherit;
 }
 
+.mobile-view-tabs {
+  display: none;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 410px 1fr;
@@ -528,8 +532,53 @@ input[type="range"] {
 }
 
 @media (max-width: 980px) {
+  body {
+    padding-top: 64px;
+  }
+
+  .mobile-view-tabs {
+    position: fixed;
+    z-index: 1000;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(5, 11, 19, 0.92);
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-view-tab {
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .mobile-view-tab.active {
+    border-color: rgba(125, 249, 199, 0.5);
+    color: var(--accent);
+    background: rgba(125, 249, 199, 0.12);
+  }
+
   .shell {
     grid-template-columns: 1fr;
+  }
+
+  body:not([data-mobile-view="map"]) .map-stage {
+    display: none;
+  }
+
+  body[data-mobile-view="map"] .sidebar {
+    display: none;
   }
 
   .sidebar {
