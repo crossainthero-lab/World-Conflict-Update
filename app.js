@@ -32,6 +32,7 @@ let activeConflictId = "";
 let activeFeed = null;
 let situations = [];
 let activeSituationId = "";
+let activeSituationGroupId = "";
 let markers = [];
 let markerLookup = new Map();
 let map;
@@ -403,6 +404,16 @@ function getActiveSituation() {
   return situations.find((situation) => situation.id === activeSituationId);
 }
 
+function findSituationById(situationId) {
+  for (const entry of situations) {
+    if (entry.id === situationId) return entry;
+    const child = entry.situations?.find((situation) => situation.id === situationId);
+    if (child) return child;
+  }
+
+  return null;
+}
+
 function renderSituationTimeline(situation) {
   timelineList.innerHTML = "";
 
@@ -413,7 +424,10 @@ function renderSituationTimeline(situation) {
   }
 
   timelineTitle.textContent = situation.title;
-  timelineMeta.textContent = `${situation.locationName} | Severity ${situation.severity}/5 | ${situation.sourceCount} sources`;
+  timelineMeta.textContent =
+    situation.type === "group"
+      ? `${situation.countryName} | ${situation.situations.length} situations | ${situation.sourceCount} sources`
+      : `${situation.locationName} | Severity ${situation.severity}/5 | ${situation.sourceCount} sources`;
 
   situation.timeline.forEach((item) => {
     const article = document.createElement("article");
@@ -438,7 +452,7 @@ function renderSituationTimeline(situation) {
 
 function selectSituation(situationId, focusMap = true) {
   activeSituationId = situationId;
-  const situation = getActiveSituation();
+  const situation = findSituationById(situationId);
 
   situationsList.querySelectorAll(".situation-card").forEach((button) => {
     button.classList.toggle("active", button.dataset.situationId === situationId);
@@ -458,6 +472,50 @@ function selectSituation(situationId, focusMap = true) {
         `<h3 class="popup-title">${situation.title}</h3><p class="popup-copy">${situation.timeline.length} timeline updates | Severity ${situation.severity}/5</p>`
       )
       .openOn(map);
+  }
+}
+
+function renderSituationGroup(group) {
+  timelineTitle.textContent = group.title;
+  timelineMeta.textContent = `${group.countryName} | ${group.situations.length} detected situations | ${group.sourceCount} sources`;
+  timelineList.innerHTML = "";
+
+  group.situations.forEach((situation) => {
+    const button = document.createElement("button");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const latest = document.createElement("small");
+
+    button.type = "button";
+    button.className = "situation-card nested";
+    title.textContent = situation.title;
+    meta.textContent = `${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
+    latest.textContent = `Latest ${formatRelativeTime(situation.latestAt)}`;
+    button.append(title, meta, latest);
+    button.addEventListener("click", () => selectSituation(situation.id));
+    timelineList.appendChild(button);
+  });
+}
+
+function selectSituationEntry(entryId, focusMap = true) {
+  const entry = situations.find((situation) => situation.id === entryId);
+  if (!entry) return;
+
+  activeSituationGroupId = entryId;
+  activeSituationId = entry.type === "group" ? "" : entry.id;
+  situationsList.querySelectorAll(".situation-card").forEach((button) => {
+    button.classList.toggle("active", button.dataset.situationId === entryId);
+  });
+
+  if (entry.type === "group") {
+    renderSituationGroup(entry);
+  } else {
+    renderSituationTimeline(entry);
+  }
+
+  if (focusMap && entry.coords && document.body.dataset.mobileView !== "situations") {
+    setMobileView("map");
+    map.flyTo(entry.coords, entry.exactness === "exact" ? 6 : 4, { duration: 0.9 });
   }
 }
 
@@ -482,19 +540,22 @@ function renderSituations() {
     button.className = "situation-card";
     button.dataset.situationId = situation.id;
     title.textContent = situation.title;
-    meta.textContent = `${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
+    meta.textContent =
+      situation.type === "group"
+        ? `${situation.situations.length} situations | ${situation.updateCount || situation.timeline.length} updates | ${situation.sourceCount} sources`
+        : `${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
     latest.textContent = `Latest ${formatRelativeTime(situation.latestAt)}`;
 
     button.append(title, meta, latest);
-    button.addEventListener("click", () => selectSituation(situation.id));
+    button.addEventListener("click", () => selectSituationEntry(situation.id));
     situationsList.appendChild(button);
   });
 
-  if (!activeSituationId || !situations.some((situation) => situation.id === activeSituationId)) {
-    activeSituationId = situations[0].id;
+  if (!activeSituationGroupId || !situations.some((situation) => situation.id === activeSituationGroupId)) {
+    activeSituationGroupId = situations[0].id;
   }
 
-  selectSituation(activeSituationId, false);
+  selectSituationEntry(activeSituationGroupId, false);
 }
 
 function renderTabs() {

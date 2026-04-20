@@ -22,10 +22,7 @@ const NEWS_FEEDS = [
   { name: "CBS World", url: "https://www.cbsnews.com/latest/rss/world" },
   { name: "ABC News International", url: "https://abcnews.go.com/abcnews/internationalheadlines" },
   { name: "CBC World", url: "https://www.cbc.ca/cmlink/rss-world" },
-  { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" },
-  { name: "RFE/RL Ukraine", url: "https://www.rferl.org/api/zrqiteuuir" },
-  { name: "Kyiv Independent", url: "https://kyivindependent.com/news-archive/rss/" },
-  { name: "Ukrinform", url: "https://www.ukrinform.net/rss/block-lastnews" }
+  { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" }
 ];
 
 const SITUATION_QUERIES = [
@@ -168,6 +165,10 @@ function findLocation(text, locations) {
   return null;
 }
 
+function getCountryName(location) {
+  return location.country || location.name.split(",").pop().trim();
+}
+
 function detectTopic(text) {
   const haystack = text.toLowerCase();
   return (
@@ -276,7 +277,7 @@ async function getOptionalSource(label, fetcher) {
   }
 }
 
-function buildSituations(items, locations) {
+function buildSituationGroups(items, locations) {
   const groups = new Map();
 
   items.forEach((item) => {
@@ -301,6 +302,7 @@ function buildSituations(items, locations) {
     const group = groups.get(groupKey) || {
       id: groupKey.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
       title: `${location.name} ${topic.label}`,
+      countryName: getCountryName(location),
       locationName: location.name,
       coords: location.coords,
       exactness: location.exactness,
@@ -329,7 +331,7 @@ function buildSituations(items, locations) {
     groups.set(groupKey, group);
   });
 
-  return [...groups.values()]
+  const situations = [...groups.values()]
     .map((group) => {
       const timeline = dedupeTimeline(group.timeline)
         .sort((a, b) => Date.parse(b.reportedAt) - Date.parse(a.reportedAt))
@@ -345,11 +347,66 @@ function buildSituations(items, locations) {
     })
     .filter((group) => group.timeline.length >= 1)
     .sort((a, b) => {
-      const severityDelta = b.severity - a.severity;
-      if (severityDelta) return severityDelta;
       return Date.parse(b.latestAt) - Date.parse(a.latestAt);
     })
-    .slice(0, 12);
+    .slice(0, 36);
+
+  const countryGroups = new Map();
+  situations.forEach((situation) => {
+    const key = situation.countryName;
+    const group = countryGroups.get(key) || {
+      id: `country-${key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`,
+      type: "group",
+      title: `${key} Situation Group`,
+      countryName: key,
+      locationName: key,
+      coords: situation.coords,
+      exactness: "approximate",
+      severity: 1,
+      sourceCount: 0,
+      latestAt: situation.latestAt,
+      situations: []
+    };
+
+    group.situations.push(situation);
+    group.severity = Math.max(group.severity, situation.severity);
+    group.latestAt =
+      Date.parse(situation.latestAt) > Date.parse(group.latestAt)
+        ? situation.latestAt
+        : group.latestAt;
+    countryGroups.set(key, group);
+  });
+
+  return [...countryGroups.values()]
+    .map((group) => {
+      const sourceLabels = new Set(
+        group.situations.flatMap((situation) =>
+          situation.timeline.map((item) => item.sourceLabel)
+        )
+      );
+      const sortedSituations = group.situations.sort((a, b) => Date.parse(b.latestAt) - Date.parse(a.latestAt));
+
+      const totalUpdates = sortedSituations.reduce((count, situation) => {
+        return count + situation.timeline.length;
+      }, 0);
+
+      if (totalUpdates === 1) {
+        return {
+          type: "single",
+          ...sortedSituations[0]
+        };
+      }
+
+      return {
+        ...group,
+        sourceCount: sourceLabels.size,
+        updateCount: totalUpdates,
+        situations: sortedSituations.slice(0, 8),
+        timeline: sortedSituations.flatMap((situation) => situation.timeline).sort((a, b) => Date.parse(b.reportedAt) - Date.parse(a.reportedAt)).slice(0, 10)
+      };
+    })
+    .sort((a, b) => Date.parse(b.latestAt) - Date.parse(a.latestAt))
+    .slice(0, 16);
 }
 
 export async function onRequestGet(context) {
@@ -386,7 +443,7 @@ export async function onRequestGet(context) {
       ...normalizePublisherItems(publisherItems)
     ].sort((a, b) => b._publishedAt - a._publishedAt);
 
-    const situations = buildSituations(items, worldLocations);
+    const situations = buildSituationGroups(items, worldLocations);
     const failedSources = [...googleResults, ...publisherResults]
       .filter((result) => !result.ok)
       .map((result) => `${result.label}: ${result.error}`);

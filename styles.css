@@ -476,6 +476,11 @@ input[type="range"] {
   background: rgba(125, 249, 199, 0.1);
 }
 
+.situation-card.nested {
+  border-left: 2px solid var(--accent);
+  background: var(--panel-strong);
+}
+
 .situation-card strong {
   line-height: 1.25;
 }

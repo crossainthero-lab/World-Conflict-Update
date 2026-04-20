@@ -2,156 +2,182 @@
   "world-events": [
     {
       "name": "Bulgaria",
+      "country": "Bulgaria",
       "coords": [42.7339, 25.4858],
       "exactness": "approximate",
       "keywords": ["bulgaria", "bulgarian", "sofia"]
     },
     {
       "name": "Sofia, Bulgaria",
+      "country": "Bulgaria",
       "coords": [42.6977, 23.3219],
       "exactness": "exact",
       "keywords": ["sofia"]
     },
     {
       "name": "Moscow, Russia",
+      "country": "Russia",
       "coords": [55.7558, 37.6173],
       "exactness": "exact",
       "keywords": ["moscow", "kremlin"]
     },
     {
       "name": "Russia",
+      "country": "Russia",
       "coords": [61.5240, 105.3188],
       "exactness": "approximate",
       "keywords": ["russia", "russian"]
     },
     {
       "name": "Ukraine",
+      "country": "Ukraine",
       "coords": [48.3794, 31.1656],
       "exactness": "approximate",
       "keywords": ["ukraine", "ukrainian"]
     },
     {
       "name": "Israel",
+      "country": "Israel",
       "coords": [31.0461, 34.8516],
       "exactness": "approximate",
       "keywords": ["israel", "israeli"]
     },
     {
       "name": "Gaza Strip",
+      "country": "Palestine",
       "coords": [31.3547, 34.3088],
       "exactness": "approximate",
       "keywords": ["gaza", "gaza strip"]
     },
     {
       "name": "Iran",
+      "country": "Iran",
       "coords": [32.4279, 53.6880],
       "exactness": "approximate",
       "keywords": ["iran", "iranian"]
     },
     {
       "name": "United States",
+      "country": "United States",
       "coords": [39.8283, -98.5795],
       "exactness": "approximate",
       "keywords": ["united states", "usa", "u.s.", "us military", "washington"]
     },
     {
       "name": "China",
+      "country": "China",
       "coords": [35.8617, 104.1954],
       "exactness": "approximate",
       "keywords": ["china", "chinese", "beijing"]
     },
     {
       "name": "Taiwan",
+      "country": "Taiwan",
       "coords": [23.6978, 120.9605],
       "exactness": "approximate",
       "keywords": ["taiwan", "taipei"]
     },
     {
       "name": "North Korea",
+      "country": "North Korea",
       "coords": [40.3399, 127.5101],
       "exactness": "approximate",
       "keywords": ["north korea", "pyongyang"]
     },
     {
       "name": "South Korea",
+      "country": "South Korea",
       "coords": [35.9078, 127.7669],
       "exactness": "approximate",
       "keywords": ["south korea", "seoul"]
     },
     {
       "name": "Syria",
+      "country": "Syria",
       "coords": [34.8021, 38.9968],
       "exactness": "approximate",
       "keywords": ["syria", "syrian", "damascus"]
     },
     {
       "name": "Lebanon",
+      "country": "Lebanon",
       "coords": [33.8547, 35.8623],
       "exactness": "approximate",
       "keywords": ["lebanon", "lebanese", "beirut"]
     },
     {
       "name": "Yemen",
+      "country": "Yemen",
       "coords": [15.5527, 48.5164],
       "exactness": "approximate",
       "keywords": ["yemen", "yemeni", "sanaa", "houthi"]
     },
     {
       "name": "Iraq",
+      "country": "Iraq",
       "coords": [33.2232, 43.6793],
       "exactness": "approximate",
       "keywords": ["iraq", "iraqi", "baghdad"]
     },
     {
       "name": "Pakistan",
+      "country": "Pakistan",
       "coords": [30.3753, 69.3451],
       "exactness": "approximate",
       "keywords": ["pakistan", "pakistani", "islamabad"]
     },
     {
       "name": "India",
+      "country": "India",
       "coords": [20.5937, 78.9629],
       "exactness": "approximate",
       "keywords": ["india", "indian", "new delhi"]
     },
     {
       "name": "Sudan",
+      "country": "Sudan",
       "coords": [12.8628, 30.2176],
       "exactness": "approximate",
       "keywords": ["sudan", "sudanese", "khartoum", "darfur"]
     },
     {
       "name": "Myanmar",
+      "country": "Myanmar",
       "coords": [21.9162, 95.9560],
       "exactness": "approximate",
       "keywords": ["myanmar", "burma", "naypyidaw"]
     },
     {
       "name": "Venezuela",
+      "country": "Venezuela",
       "coords": [6.4238, -66.5897],
       "exactness": "approximate",
       "keywords": ["venezuela", "venezuelan", "caracas"]
     },
     {
       "name": "Poland",
+      "country": "Poland",
       "coords": [51.9194, 19.1451],
       "exactness": "approximate",
       "keywords": ["poland", "polish", "warsaw"]
     },
     {
       "name": "Romania",
+      "country": "Romania",
       "coords": [45.9432, 24.9668],
       "exactness": "approximate",
       "keywords": ["romania", "romanian", "bucharest"]
     },
     {
       "name": "Moldova",
+      "country": "Moldova",
       "coords": [47.4116, 28.3699],
       "exactness": "approximate",
       "keywords": ["moldova", "moldovan", "chisinau", "transnistria"]
     },
     {
       "name": "Turkey",
+      "country": "Turkey",
       "coords": [38.9637, 35.2433],
       "exactness": "approximate",
       "keywords": ["turkey", "turkish", "ankara", "istanbul"]
