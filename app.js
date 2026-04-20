@@ -14,7 +14,11 @@ const feedBadge = document.getElementById("feedBadge");
 const feedMessage = document.getElementById("feedMessage");
 const feedDetail = document.getElementById("feedDetail");
 const sourceMeta = document.getElementById("sourceMeta");
-const refreshMeta = document.getElementById("refreshMeta");
+const sourceControls = document.getElementById("sourceControls");
+const refreshIntervalSelect = document.getElementById("refreshIntervalSelect");
+const hideOverlayButton = document.getElementById("hideOverlayButton");
+const showOverlayButton = document.getElementById("showOverlayButton");
+const mapOverlay = document.querySelector(".map-overlay");
 
 let conflicts = [];
 let activeConflictId = "";
@@ -24,6 +28,8 @@ let markerLookup = new Map();
 let map;
 let tileLayer;
 let autoRefreshTimer;
+let sourceFilter = "all";
+let userRefreshIntervalSeconds = Number(refreshIntervalSelect.value);
 
 function setFeedState(state, message, detail = "") {
   feedBadge.className = `debug-badge debug-badge-${state}`;
@@ -69,8 +75,10 @@ function getFilteredEvents() {
   return events.filter((event) => {
     const haystack = `${event.title} ${event.description} ${event.locationName} ${event.category}`
       .toLowerCase();
+    const matchesSource = sourceFilter === "all" || event.sourceType === sourceFilter;
 
     return (
+      matchesSource &&
       (!query || haystack.includes(query)) &&
       event.severity >= minimumSeverity &&
       event.confidence >= minimumConfidence
@@ -131,6 +139,58 @@ function buildClusterPopup(group) {
       <div class="cluster-list">${items}</div>
     </div>
   `;
+}
+
+function getSourceSummary() {
+  if (!activeFeed?.events?.length) {
+    return "No sources loaded yet.";
+  }
+
+  if (sourceFilter === "publisher-rss") {
+    const publishers = [
+      ...new Set(
+        activeFeed.events
+          .filter((event) => event.sourceType === "publisher-rss")
+          .map((event) => event.sourceLabel)
+      )
+    ];
+
+    return publishers.length
+      ? `Bundle: ${publishers.join(", ")}`
+      : "Bundle: no matching publisher items in current feed.";
+  }
+
+  if (sourceFilter === "google-news-rss") {
+    return `Google News: ${activeFeed.events.filter((event) => event.sourceType === "google-news-rss").length}`;
+  }
+
+  if (sourceFilter === "gdelt-doc") {
+    return `GDELT: ${activeFeed.events.filter((event) => event.sourceType === "gdelt-doc").length}`;
+  }
+
+  const counts = activeFeed.events.reduce((summary, event) => {
+    const key = event.sourceType || "unknown";
+    summary[key] = (summary[key] || 0) + 1;
+    return summary;
+  }, {});
+
+  const labels = {
+    "google-news-rss": "Google News",
+    "gdelt-doc": "GDELT",
+    "publisher-rss": "Bundle"
+  };
+
+  return Object.entries(counts)
+    .map(([key, count]) => `${labels[key] || key}: ${count}`)
+    .join(" | ");
+}
+
+function setSourceFilter(nextFilter) {
+  sourceFilter = nextFilter;
+  sourceControls.querySelectorAll(".source-button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.source === nextFilter);
+  });
+  updateView(false);
 }
 
 function clearMarkers() {
@@ -306,10 +366,10 @@ function renderTabs() {
   tabsRoot.innerHTML = "";
 
   conflicts.forEach((conflict) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "conflict-tab";
-    button.textContent = conflict.title;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "conflict-tab";
+    button.textContent = `${conflict.flags || ""} ${conflict.title}`.trim();
 
     if (conflict.id === activeConflictId) {
       button.classList.add("active");
@@ -329,16 +389,13 @@ function updateView(focusMap = false) {
   const activeConflict = getActiveConflict();
   const events = getFilteredEvents();
 
-  activeConflictTitle.textContent = activeConflict?.title || "WorldConflictUpdate";
+  activeConflictTitle.textContent = activeConflict?.title || "World Conflict Update";
   activeConflictSummary.textContent = activeConflict?.summary || "";
   severityValue.textContent = `${severityInput.value}+`;
   confidenceValue.textContent = `${confidenceInput.value}+`;
 
   if (activeFeed) {
-    sourceMeta.textContent = `Source: ${activeFeed.sourceLabel}`;
-    refreshMeta.textContent = `Auto refresh: every ${Math.round(
-      (activeFeed.refreshIntervalSeconds || 600) / 60
-    )} min`;
+    sourceMeta.textContent = `Sources: ${getSourceSummary()}`;
   }
 
   renderMarkers(events);
@@ -367,7 +424,7 @@ async function loadFeed(focusMap = false) {
     return;
   }
 
-  setFeedState("pending", "Refreshing live incident feed from localhost backend.");
+  setFeedState("pending", "Refreshing live source network.");
 
   try {
     const response = await fetch(`./api/events?conflict=${encodeURIComponent(activeConflictId)}`, {
@@ -393,7 +450,7 @@ async function loadFeed(focusMap = false) {
   } catch (error) {
     setFeedState(
       "error",
-      "Unable to reach the localhost feed endpoint.",
+      "Unable to reach the live feed endpoint.",
       error.message
     );
   }
@@ -401,7 +458,7 @@ async function loadFeed(focusMap = false) {
 
 function scheduleAutoRefresh() {
   window.clearTimeout(autoRefreshTimer);
-  const intervalMs = (activeFeed?.refreshIntervalSeconds || 600) * 1000;
+  const intervalMs = userRefreshIntervalSeconds * 1000;
   autoRefreshTimer = window.setTimeout(() => {
     loadFeed(false);
   }, intervalMs);
@@ -412,7 +469,7 @@ function initializeMap() {
     setFeedState(
       "error",
       "Leaflet did not load.",
-      "Start the app through localhost so the browser can load remote dependencies cleanly."
+      "The map library was blocked or failed to load from the network."
     );
     return false;
   }
@@ -433,7 +490,7 @@ function initializeMap() {
     setFeedState(
       "error",
       "Map tiles failed to load.",
-      "Make sure you are opening the app through http://localhost:8080 instead of file://."
+      "Map tiles were blocked by the browser or network. Try refreshing or opening the deployed Pages URL."
     );
   });
 
@@ -444,8 +501,25 @@ searchInput.addEventListener("input", () => updateView());
 severityInput.addEventListener("input", () => updateView());
 confidenceInput.addEventListener("input", () => updateView());
 refreshButton.addEventListener("click", () => loadFeed(false));
+sourceControls.addEventListener("click", (event) => {
+  const button = event.target.closest(".source-button");
+  if (!button) return;
+  setSourceFilter(button.dataset.source);
+});
+refreshIntervalSelect.addEventListener("change", () => {
+  userRefreshIntervalSeconds = Number(refreshIntervalSelect.value);
+  scheduleAutoRefresh();
+});
+hideOverlayButton.addEventListener("click", () => {
+  mapOverlay.classList.add("collapsed");
+  showOverlayButton.hidden = false;
+});
+showOverlayButton.addEventListener("click", () => {
+  mapOverlay.classList.remove("collapsed");
+  showOverlayButton.hidden = true;
+});
 
-setFeedState("pending", "Booting localhost app.");
+setFeedState("pending", "Booting live intel board.");
 
 if (initializeMap()) {
   loadConflicts()

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WorldConflictUpdate</title>
+    <title>World Conflict Update</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,11 +22,17 @@
     <div class="shell">
       <aside class="sidebar">
         <div class="hero">
-          <p class="eyebrow">Launch Build</p>
-          <h1>WorldConflictUpdate</h1>
+          <nav class="social-links" aria-label="Social links">
+            <a href="https://www.tiktok.com/@croissant.c8" target="_blank" rel="noreferrer">TikTok</a>
+            <a aria-disabled="true">Instagram</a>
+            <a aria-disabled="true">Facebook</a>
+            <a aria-disabled="true">Telegram</a>
+          </nav>
+          <p class="eyebrow">Live Intel Board</p>
+          <h1>World Conflict Update</h1>
           <p class="intro">
-            A localhost-served conflict map that blends real-source ingestion,
-            confidence-ranked markers, and severity-aware incident browsing.
+            A live conflict map blending multi-source reporting, confidence-ranked
+            markers, and severity-aware incident browsing.
           </p>
         </div>
 
@@ -70,7 +76,7 @@
             <span id="feedBadge" class="debug-badge debug-badge-pending">Loading</span>
           </div>
           <p id="feedMessage" class="overlay-copy">
-            Waiting for localhost backend data.
+            Waiting for live source network.
           </p>
           <p id="feedDetail" class="debug-detail"></p>
         </section>
@@ -86,16 +92,42 @@
 
       <main class="map-stage">
         <div class="map-overlay">
+          <button id="hideOverlayButton" class="overlay-toggle" type="button">
+            Hide
+          </button>
           <div>
             <p class="eyebrow">Focused Conflict</p>
             <h2 id="activeConflictTitle">Loading...</h2>
           </div>
           <p id="activeConflictSummary" class="overlay-copy"></p>
-          <div class="overlay-meta">
-            <span id="sourceMeta" class="meta-pill">Source: pending</span>
-            <span id="refreshMeta" class="meta-pill">Auto refresh: pending</span>
+          <div class="overlay-controls">
+            <div>
+              <span class="control-label">Sources</span>
+              <div class="source-controls" id="sourceControls">
+                <button class="source-button active" data-source="all" type="button">All</button>
+                <button class="source-button" data-source="google-news-rss" type="button">Google News</button>
+                <button class="source-button" data-source="gdelt-doc" type="button">GDELT</button>
+                <button class="source-button" data-source="publisher-rss" type="button">Bundle</button>
+              </div>
+              <p id="sourceMeta" class="source-detail">Source: pending</p>
+            </div>
+            <label class="refresh-control">
+              <span class="control-label">Auto refresh</span>
+              <select id="refreshIntervalSelect">
+                <option value="60">Every minute</option>
+                <option value="600" selected>Every 10 minutes</option>
+                <option value="1800">Every 30 minutes</option>
+                <option value="3600">Every hour</option>
+                <option value="21600">Every 6 hours</option>
+                <option value="43200">Every 12 hours</option>
+                <option value="86400">Every 24 hours</option>
+              </select>
+            </label>
           </div>
         </div>
+        <button id="showOverlayButton" class="overlay-dock" type="button" hidden>
+          Focused Conflict
+        </button>
 
         <div id="map"></div>
       </main>

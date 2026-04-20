@@ -50,6 +50,35 @@ a {
   overflow-y: auto;
 }
 
+.social-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.social-links a {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.72rem;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.social-links a:hover {
+  border-color: rgba(125, 249, 199, 0.45);
+  background: rgba(125, 249, 199, 0.1);
+}
+
+.social-links a[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .hero h1,
 .map-overlay h2 {
   margin: 0;
@@ -59,6 +88,8 @@ a {
   letter-spacing: -0.08em;
   line-height: 1;
   text-transform: uppercase;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -282,8 +313,94 @@ input[type="range"] {
   box-shadow: var(--shadow);
 }
 
+.map-overlay.collapsed {
+  display: none;
+}
+
+.overlay-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.overlay-dock {
+  position: absolute;
+  z-index: 500;
+  top: 36px;
+  left: 36px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  background: rgba(7, 17, 33, 0.82);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
 .overlay-meta {
   margin-top: 14px;
+}
+
+.overlay-controls {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.control-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.source-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.source-button {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.source-button.active,
+.source-button:hover {
+  border-color: rgba(125, 249, 199, 0.45);
+  background: rgba(125, 249, 199, 0.1);
+}
+
+.source-detail {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.refresh-control select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: #0b1729;
 }
 
 #map {

@@ -1,4 +1,4 @@
-# WorldConflictUpdate
+# World Conflict Update
 
 Deployable conflict-event map prototype with a static frontend and serverless API routes.
 
@@ -34,7 +34,7 @@ This is free and deployable, but still heuristic. It is best thought of as a str
 
 - `Russia-Ukraine`
 - `Israel-Gaza`
-- `Israel-Iran-USA`
+- `Iran Crisis`
 - confidence `1-5`
 - severity `1-5`
 - exact and approximate markers

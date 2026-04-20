@@ -2,6 +2,7 @@
   {
     "id": "russia-ukraine",
     "title": "Russia-Ukraine",
+    "flags": "\ud83c\uddf7\ud83c\uddfa \ud83c\uddfa\ud83c\udde6",
     "summary": "Live conflict monitoring across Ukraine with exact markers when reporting strongly anchors to a city or landmark, and approximate markers when only a broader area is supported.",
     "focus": {
       "center": [49.0, 31.2],
@@ -17,6 +18,7 @@
   {
     "id": "israel-gaza",
     "title": "Israel-Gaza",
+    "flags": "\ud83c\uddee\ud83c\uddf1 \ud83c\uddf5\ud83c\uddf8",
     "summary": "Tracks strikes, clashes, aid-route disruption, and major military developments in and around Gaza with confidence-ranked geography.",
     "focus": {
       "center": [31.4, 34.4],
@@ -31,7 +33,8 @@
   },
   {
     "id": "israel-iran-usa",
-    "title": "Israel-Iran-USA",
+    "title": "Iran Crisis",
+    "flags": "\ud83c\uddee\ud83c\uddf7 \ud83c\uddee\ud83c\uddf1 \ud83c\uddfa\ud83c\uddf8",
     "summary": "Watches the Israel-Iran-United States escalation space, including strikes, military deployments, intercepts, and regional spillover reporting.",
     "focus": {
       "center": [32.5, 45.0],
