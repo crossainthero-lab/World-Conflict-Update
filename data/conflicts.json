@@ -1,5 +1,21 @@
 [
   {
+    "id": "world-events",
+    "title": "World Events",
+    "flags": "\ud83c\udf10",
+    "summary": "A wider live map for conflict-adjacent world events, military alerts, political escalations, protests, sanctions, and regional incidents that do not fit neatly inside one focused conflict.",
+    "focus": {
+      "center": [20.0, 10.0],
+      "zoom": 2
+    },
+    "rssQuery": "war conflict military strike drone missile protest sanctions border crisis attack when:2d",
+    "gdeltQuery": "(war OR conflict OR military OR strike OR drone OR missile OR protest OR sanctions OR border OR crisis OR attack)",
+    "gdeltTimespan": "6h",
+    "sourceKeywords": ["war", "conflict", "military", "strike", "drone", "missile", "protest", "sanctions", "border", "crisis", "attack", "explosion", "clash"],
+    "refreshIntervalSeconds": 600,
+    "maxAgeHours": 24
+  },
+  {
     "id": "russia-ukraine",
     "title": "Russia-Ukraine",
     "flags": "\ud83c\uddf7\ud83c\uddfa \ud83c\uddfa\ud83c\udde6",
@@ -11,7 +27,7 @@
     "rssQuery": "Ukraine drone missile shelling bombing strike attack when:2d",
     "gdeltQuery": "(Ukraine OR Kyiv OR Kharkiv OR Odesa OR Dnipro OR Zaporizhzhia OR Sumy OR Kherson OR Donetsk OR Luhansk OR Belgorod OR Taganrog) (drone OR missile OR shelling OR bombing OR strike OR attack)",
     "gdeltTimespan": "6h",
-    "sourceKeywords": ["ukraine", "russia", "kyiv", "kharkiv", "odesa", "dnipro", "zaporizhzhia", "sumy", "kherson", "donetsk", "luhansk", "belgorod", "taganrog", "crimea", "donbas", "drone", "missile", "shelling", "strike"],
+    "sourceKeywords": ["ukraine", "ukrainian", "kyiv", "kharkiv", "odesa", "dnipro", "zaporizhzhia", "sumy", "kherson", "donetsk", "luhansk", "belgorod", "taganrog", "crimea", "donbas", "drone", "missile", "shelling", "strike"],
     "refreshIntervalSeconds": 600,
     "maxAgeHours": 24
   },
@@ -27,7 +43,7 @@
     "rssQuery": "Gaza Rafah Khan Younis Deir al-Balah airstrike bombing attack aid shelling when:2d",
     "gdeltQuery": "(Gaza OR Rafah OR \"Khan Younis\" OR \"Deir al-Balah\" OR Jabalia OR \"Beit Hanoun\" OR Ashkelon OR Jerusalem OR \"Tel Aviv\") (airstrike OR bombing OR attack OR shelling OR aid OR clashes)",
     "gdeltTimespan": "6h",
-    "sourceKeywords": ["gaza", "rafah", "khan younis", "deir al-balah", "deir al balah", "jabalia", "beit hanoun", "israel", "hamas", "ashkelon", "jerusalem", "tel aviv", "airstrike", "shelling", "aid"],
+    "sourceKeywords": ["gaza", "rafah", "khan younis", "deir al-balah", "deir al balah", "jabalia", "beit hanoun", "hamas", "ashkelon", "jerusalem", "tel aviv", "airstrike", "shelling", "aid"],
     "refreshIntervalSeconds": 600,
     "maxAgeHours": 24
   },

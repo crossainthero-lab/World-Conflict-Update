@@ -132,8 +132,17 @@ async function fetchGdeltDoc(query, timespan) {
 
 function findLocation(text, locations) {
   const haystack = text.toLowerCase();
+  const rankedLocations = [...locations].sort((a, b) => {
+    if (a.exactness !== b.exactness) {
+      return a.exactness === "exact" ? -1 : 1;
+    }
 
-  for (const location of locations) {
+    const longestA = Math.max(...a.keywords.map((keyword) => keyword.length));
+    const longestB = Math.max(...b.keywords.map((keyword) => keyword.length));
+    return longestB - longestA;
+  });
+
+  for (const location of rankedLocations) {
     for (const keyword of location.keywords) {
       if (haystack.includes(keyword.toLowerCase())) {
         return location;
@@ -211,27 +220,31 @@ function toEvent(item, conflict, locations, index) {
   const title = item.normalizedTitle;
   const sourceLabel = item.normalizedSourceLabel;
   const description = item.normalizedDescription;
-  const location =
-    findLocation(`${title} ${description}`, locations) ||
-    {
-      name: `${conflict.title} region`,
-      coords: conflict.focus.center,
-      exactness: "approximate",
-      keywords: []
-    };
+  const location = findLocation(`${title} ${description}`, locations);
+
+  if (!location && conflict.id === "world-events") {
+    return null;
+  }
+
+  const mappedLocation = location || {
+    name: `${conflict.title} region`,
+    coords: conflict.focus.center,
+    exactness: "approximate",
+    keywords: []
+  };
 
   const severity = severityScore(`${title} ${description}`);
-  const confidence = confidenceFromLocation(location, title, description);
+  const confidence = confidenceFromLocation(mappedLocation, title, description);
 
   return {
     id: `${conflict.id}-${item.sourceType}-${index}`,
     title,
     description: description.slice(0, 240),
-    locationName: location.name,
-    coords: location.coords,
+    locationName: mappedLocation.name,
+    coords: mappedLocation.coords,
     severity,
     confidence,
-    exactness: location.exactness,
+    exactness: mappedLocation.exactness,
     reportedAt: item.reportedAt,
     category: severity >= 4 ? "Attack" : severity === 3 ? "Military" : "Developing",
     sourceLabel,
@@ -362,9 +375,14 @@ export async function onRequestGet(context) {
         : [])
     ].sort((a, b) => Date.parse(b.reportedAt) - Date.parse(a.reportedAt)).slice(0, 50);
 
-    const locations = locationsMap[conflict.id] || [];
+    const locations = [
+      ...(locationsMap[conflict.id] || []),
+      ...(conflict.id === "world-events" ? [] : locationsMap["world-events"] || [])
+    ];
     const events = deduplicateEvents(
-      items.map((item, index) => toEvent(item, conflict, locations, index + 1))
+      items
+        .map((item, index) => toEvent(item, conflict, locations, index + 1))
+        .filter(Boolean)
     );
 
     if (!events.length) {
