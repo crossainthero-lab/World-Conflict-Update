@@ -224,13 +224,31 @@ function Get-MatchedLocation {
   )
 
   $haystack = $Text.ToLowerInvariant()
+  $weakWords = @("chinese", "russian", "american", "israeli", "iranian", "ukrainian", "lebanese", "british", "turkish", "indian", "pakistani")
+  $bestMatch = $null
+  $bestScore = 0
 
   foreach ($location in $Locations) {
     foreach ($keyword in $location.keywords) {
-      if ($haystack.Contains($keyword.ToLowerInvariant())) {
-        return $location
+      $normalizedKeyword = $keyword.ToLowerInvariant()
+      $pattern = "(^|[^a-z])$([regex]::Escape($normalizedKeyword))([^a-z]|$)"
+
+      if ($haystack -match $pattern) {
+        $score = $normalizedKeyword.Length
+        if ($location.exactness -eq "exact") { $score += 15 }
+        if ($location.PSObject.Properties["country"] -and $normalizedKeyword -eq $location.country.ToLowerInvariant()) { $score += 10 }
+        if ($weakWords -contains $normalizedKeyword) { $score -= 12 }
+
+        if ($score -gt $bestScore) {
+          $bestScore = $score
+          $bestMatch = $location
+        }
       }
     }
+  }
+
+  if ($bestScore -ge 5) {
+    return $bestMatch
   }
 
   return $null
@@ -345,6 +363,54 @@ function Get-SituationTopic {
   return "Developing Situation"
 }
 
+function Get-CountryName {
+  param([object]$Location)
+
+  if ($Location.PSObject.Properties["country"] -and -not [string]::IsNullOrWhiteSpace([string]$Location.country)) {
+    return [string]$Location.country
+  }
+
+  return ([string]$Location.name).Split(",")[-1].Trim()
+}
+
+function Get-CountryFlag {
+  param([string]$CountryName)
+
+  $flags = @{
+    "Bulgaria" = "🇧🇬"
+    "Russia" = "🇷🇺"
+    "Ukraine" = "🇺🇦"
+    "Israel" = "🇮🇱"
+    "Palestine" = "🇵🇸"
+    "Iran" = "🇮🇷"
+    "United States" = "🇺🇸"
+    "China" = "🇨🇳"
+    "Taiwan" = "🇹🇼"
+    "North Korea" = "🇰🇵"
+    "South Korea" = "🇰🇷"
+    "Syria" = "🇸🇾"
+    "Lebanon" = "🇱🇧"
+    "Yemen" = "🇾🇪"
+    "Iraq" = "🇮🇶"
+    "Pakistan" = "🇵🇰"
+    "India" = "🇮🇳"
+    "Sudan" = "🇸🇩"
+    "Myanmar" = "🇲🇲"
+    "Venezuela" = "🇻🇪"
+    "Poland" = "🇵🇱"
+    "Romania" = "🇷🇴"
+    "Moldova" = "🇲🇩"
+    "Turkey" = "🇹🇷"
+    "United Kingdom" = "🇬🇧"
+  }
+
+  if ($flags.ContainsKey($CountryName)) {
+    return $flags[$CountryName]
+  }
+
+  return ""
+}
+
 function Test-LowSignalPoliticalDocument {
   param([string]$Text)
 
@@ -410,9 +476,13 @@ function Get-SituationsFeed {
 
       $key = "$($location.name)|$topic"
       if (-not $groups.ContainsKey($key)) {
+        $countryName = Get-CountryName -Location $location
+        $countryFlag = Get-CountryFlag -CountryName $countryName
         $groups[$key] = [PSCustomObject]@{
           id = ($key.ToLowerInvariant() -replace "[^a-z0-9]+", "-").Trim("-")
-          title = "$($location.name) $topic"
+          title = "$countryFlag $($location.name) $topic".Trim()
+          countryName = $countryName
+          countryFlag = $countryFlag
           locationName = $location.name
           coords = @([double]$location.coords[0], [double]$location.coords[1])
           exactness = $location.exactness

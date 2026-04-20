@@ -70,6 +70,48 @@ const TOPICS = [
   }
 ];
 
+const COUNTRY_FLAGS = {
+  Bulgaria: "\ud83c\udde7\ud83c\uddec",
+  Russia: "\ud83c\uddf7\ud83c\uddfa",
+  Ukraine: "\ud83c\uddfa\ud83c\udde6",
+  Israel: "\ud83c\uddee\ud83c\uddf1",
+  Palestine: "\ud83c\uddf5\ud83c\uddf8",
+  Iran: "\ud83c\uddee\ud83c\uddf7",
+  "United States": "\ud83c\uddfa\ud83c\uddf8",
+  China: "\ud83c\udde8\ud83c\uddf3",
+  Taiwan: "\ud83c\uddf9\ud83c\uddfc",
+  "North Korea": "\ud83c\uddf0\ud83c\uddf5",
+  "South Korea": "\ud83c\uddf0\ud83c\uddf7",
+  Syria: "\ud83c\uddf8\ud83c\uddfe",
+  Lebanon: "\ud83c\uddf1\ud83c\udde7",
+  Yemen: "\ud83c\uddfe\ud83c\uddea",
+  Iraq: "\ud83c\uddee\ud83c\uddf6",
+  Pakistan: "\ud83c\uddf5\ud83c\uddf0",
+  India: "\ud83c\uddee\ud83c\uddf3",
+  Sudan: "\ud83c\uddf8\ud83c\udde9",
+  Myanmar: "\ud83c\uddf2\ud83c\uddf2",
+  Venezuela: "\ud83c\uddfb\ud83c\uddea",
+  Poland: "\ud83c\uddf5\ud83c\uddf1",
+  Romania: "\ud83c\uddf7\ud83c\uddf4",
+  Moldova: "\ud83c\uddf2\ud83c\udde9",
+  Turkey: "\ud83c\uddf9\ud83c\uddf7",
+  "United Kingdom": "\ud83c\uddec\ud83c\udde7"
+};
+
+const WEAK_LOCATION_WORDS = new Set([
+  "chinese",
+  "russian",
+  "american",
+  "israeli",
+  "iranian",
+  "ukrainian",
+  "lebanese",
+  "british",
+  "turkish",
+  "indian",
+  "pakistani"
+]);
+
 function stripHtml(text) {
   return decodeHtmlEntities(text).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -154,19 +196,37 @@ function findLocation(text, locations) {
     return longestB - longestA;
   });
 
+  let bestMatch = null;
+  let bestScore = 0;
+
   for (const location of rankedLocations) {
     for (const keyword of location.keywords) {
-      if (haystack.includes(keyword.toLowerCase())) {
-        return location;
+      const normalizedKeyword = keyword.toLowerCase();
+      const pattern = new RegExp(`(^|[^a-z])${normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`, "i");
+
+      if (pattern.test(haystack)) {
+        let score = normalizedKeyword.length;
+        if (location.exactness === "exact") score += 15;
+        if (location.country && normalizedKeyword === location.country.toLowerCase()) score += 10;
+        if (WEAK_LOCATION_WORDS.has(normalizedKeyword)) score -= 12;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = location;
+        }
       }
     }
   }
 
-  return null;
+  return bestScore >= 5 ? bestMatch : null;
 }
 
 function getCountryName(location) {
   return location.country || location.name.split(",").pop().trim();
+}
+
+function getCountryFlag(countryName) {
+  return COUNTRY_FLAGS[countryName] || "";
 }
 
 function detectTopic(text) {
@@ -301,8 +361,9 @@ function buildSituationGroups(items, locations) {
     const groupKey = `${location.name}|${topic.label}`;
     const group = groups.get(groupKey) || {
       id: groupKey.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
-      title: `${location.name} ${topic.label}`,
       countryName: getCountryName(location),
+      countryFlag: getCountryFlag(getCountryName(location)),
+      title: `${getCountryFlag(getCountryName(location))} ${location.name} ${topic.label}`.trim(),
       locationName: location.name,
       coords: location.coords,
       exactness: location.exactness,
@@ -357,8 +418,9 @@ function buildSituationGroups(items, locations) {
     const group = countryGroups.get(key) || {
       id: `country-${key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`,
       type: "group",
-      title: `${key} Situation Group`,
+      title: `${getCountryFlag(key)} ${key} Situation Group`.trim(),
       countryName: key,
+      countryFlag: getCountryFlag(key),
       locationName: key,
       coords: situation.coords,
       exactness: "approximate",

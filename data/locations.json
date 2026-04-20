@@ -64,11 +64,18 @@
       "keywords": ["united states", "usa", "u.s.", "us military", "washington"]
     },
     {
+      "name": "United Kingdom",
+      "country": "United Kingdom",
+      "coords": [55.3781, -3.4360],
+      "exactness": "approximate",
+      "keywords": ["united kingdom", "uk", "britain", "british", "england", "london", "westminster"]
+    },
+    {
       "name": "China",
       "country": "China",
       "coords": [35.8617, 104.1954],
       "exactness": "approximate",
-      "keywords": ["china", "chinese", "beijing"]
+      "keywords": ["china", "beijing"]
     },
     {
       "name": "Taiwan",
