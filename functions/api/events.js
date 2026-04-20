@@ -35,6 +35,7 @@ function stripHtml(text) {
 
 function severityScore(text) {
   const haystack = text.toLowerCase();
+  if (/(condemn|warn|urge|call for|says|said|statement|responds|reaction|backs|supports)/.test(haystack) && !/(in|near|at|over)\s+[a-z .'-]{2,40}\s+(?:after|as|when|following)?\s*(?:attack|strike|airstrike|bombing|explosion|blast|shelling)/.test(haystack)) return 1;
   if (/(nuclear|nuke|assassinat|massacre|mass casualty|hundreds killed|chemical weapon)/.test(haystack)) return 5;
   if (/(killed|dead|fatal|airstrike|bombing|explosion|missile strike|major attack)/.test(haystack)) return 4;
   if (/(missile|drone|shelling|strike|attack|raid|blast|retaliation|clash|troop|military|intercept|deployment|warning)/.test(haystack)) return 3;
@@ -140,27 +141,105 @@ async function fetchGdeltDoc(query, timespan) {
   return response.json();
 }
 
+const INCIDENT_TERMS = [
+  "airstrike",
+  "missile strike",
+  "strike",
+  "bombing",
+  "explosion",
+  "blast",
+  "shelling",
+  "drone",
+  "attack",
+  "raid",
+  "clash",
+  "fighting",
+  "killed",
+  "dead",
+  "fatal"
+];
+
+const ATTRIBUTION_TERMS = [
+  "condemn",
+  "warn",
+  "urge",
+  "says",
+  "said",
+  "statement",
+  "minister",
+  "president",
+  "parliament",
+  "government",
+  "official",
+  "spokesperson",
+  "calls for",
+  "backs",
+  "supports",
+  "announces"
+];
+
+const WEAK_LOCATION_WORDS = new Set([
+  "chinese",
+  "russian",
+  "american",
+  "israeli",
+  "iranian",
+  "ukrainian",
+  "lebanese",
+  "british",
+  "turkish",
+  "indian",
+  "pakistani"
+]);
+
+function countTermProximity(haystack, keyword, terms, radius = 70) {
+  const index = haystack.indexOf(keyword);
+  if (index < 0) return 0;
+  const start = Math.max(0, index - radius);
+  const end = Math.min(haystack.length, index + keyword.length + radius);
+  const window = haystack.slice(start, end);
+  return terms.reduce((count, term) => count + (window.includes(term) ? 1 : 0), 0);
+}
+
+function hasIncidentPreposition(haystack, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b(?:in|near|at|over|around|outside|inside|across)\\s+(?:the\\s+)?${escaped}\\b`, "i").test(haystack);
+}
+
+function hasActorAttribution(haystack, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b.{0,45}\\b(?:${ATTRIBUTION_TERMS.join("|")})\\b|\\b(?:${ATTRIBUTION_TERMS.join("|")})\\b.{0,45}\\b${escaped}\\b`, "i").test(haystack);
+}
+
 function findLocation(text, locations) {
   const haystack = text.toLowerCase();
-  const rankedLocations = [...locations].sort((a, b) => {
-    if (a.exactness !== b.exactness) {
-      return a.exactness === "exact" ? -1 : 1;
-    }
+  let bestMatch = null;
+  let bestScore = 0;
 
-    const longestA = Math.max(...a.keywords.map((keyword) => keyword.length));
-    const longestB = Math.max(...b.keywords.map((keyword) => keyword.length));
-    return longestB - longestA;
-  });
-
-  for (const location of rankedLocations) {
+  for (const location of locations) {
     for (const keyword of location.keywords) {
-      if (haystack.includes(keyword.toLowerCase())) {
-        return location;
+      const normalizedKeyword = keyword.toLowerCase();
+      const escaped = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, "i");
+
+      if (pattern.test(haystack)) {
+        let score = normalizedKeyword.length;
+        if (location.exactness === "exact") score += 18;
+        if (hasIncidentPreposition(haystack, normalizedKeyword)) score += 22;
+        score += countTermProximity(haystack, normalizedKeyword, INCIDENT_TERMS) * 9;
+        score -= countTermProximity(haystack, normalizedKeyword, ATTRIBUTION_TERMS) * 11;
+        if (WEAK_LOCATION_WORDS.has(normalizedKeyword)) score -= 12;
+        if (hasActorAttribution(haystack, normalizedKeyword)) score -= 25;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = location;
+        }
       }
     }
   }
 
-  return null;
+  return bestScore >= 12 ? bestMatch : null;
 }
 
 function deduplicateEvents(events) {

@@ -130,6 +130,7 @@ function Get-SeverityScore {
 
   $haystack = $Text.ToLowerInvariant()
   if ($haystack -match "congress|senate|house committee|hearing|bill|resolution|lawmakers" -and $haystack -notmatch "attack|strike|killed|dead|fatal|protest|sanction|oil|pipeline|missile|drone|border|troop|deployment|assassinat") { return 1 }
+  if ($haystack -match "condemn|warn|urge|call for|calls for|says|said|statement|responds|reaction|backs|supports" -and $haystack -notmatch "(in|near|at|over)\s+[a-z .'-]{2,40}\s+(after|as|when|following)?\s*(attack|strike|airstrike|bombing|explosion|blast|shelling|protest|riot)") { return 1 }
   if ($haystack -match "nuclear|nuke|assassinat|massacre|mass casualty|hundreds killed|chemical weapon") { return 5 }
   if ($haystack -match "killed|dead|fatal|airstrike|bombing|explosion|missile strike|major attack") { return 4 }
   if ($haystack -match "missile|drone|shelling|strike|attack|raid|blast|retaliation|clash|troop|military|intercept|deployment|warning") { return 3 }
@@ -225,6 +226,8 @@ function Get-MatchedLocation {
 
   $haystack = $Text.ToLowerInvariant()
   $weakWords = @("chinese", "russian", "american", "israeli", "iranian", "ukrainian", "lebanese", "british", "turkish", "indian", "pakistani")
+  $incidentTerms = @("airstrike", "missile strike", "strike", "bombing", "explosion", "blast", "shelling", "drone", "attack", "raid", "clash", "fighting", "killed", "dead", "fatal", "protest", "riot", "unrest", "border", "incursion", "pipeline", "refinery", "tanker")
+  $attributionTerms = @("condemn", "warn", "urge", "says", "said", "statement", "minister", "president", "parliament", "government", "official", "spokesperson", "calls for", "backs", "supports", "announces")
   $bestMatch = $null
   $bestScore = 0
 
@@ -235,8 +238,20 @@ function Get-MatchedLocation {
 
       if ($haystack -match $pattern) {
         $score = $normalizedKeyword.Length
-        if ($location.exactness -eq "exact") { $score += 15 }
-        if ($location.PSObject.Properties["country"] -and $normalizedKeyword -eq $location.country.ToLowerInvariant()) { $score += 10 }
+        if ($location.exactness -eq "exact") { $score += 18 }
+        if ($haystack -match "\b(in|near|at|over|around|outside|inside|across)\s+(the\s+)?$([regex]::Escape($normalizedKeyword))\b") { $score += 22 }
+        $start = [Math]::Max(0, $haystack.IndexOf($normalizedKeyword) - 80)
+        $length = [Math]::Min($haystack.Length - $start, $normalizedKeyword.Length + 160)
+        $window = $haystack.Substring($start, $length)
+        foreach ($term in $incidentTerms) {
+          if ($window.Contains($term)) { $score += 9 }
+        }
+        foreach ($term in $attributionTerms) {
+          if ($window.Contains($term)) { $score -= 11 }
+        }
+        $attributionPattern = "\b$([regex]::Escape($normalizedKeyword))\b.{0,50}\b($($attributionTerms -join '|'))\b|\b($($attributionTerms -join '|'))\b.{0,50}\b$([regex]::Escape($normalizedKeyword))\b"
+        if ($haystack -match $attributionPattern) { $score -= 25 }
+        if ($location.PSObject.Properties["country"] -and $normalizedKeyword -eq $location.country.ToLowerInvariant()) { $score += 4 }
         if ($weakWords -contains $normalizedKeyword) { $score -= 12 }
 
         if ($score -gt $bestScore) {
@@ -247,7 +262,7 @@ function Get-MatchedLocation {
     }
   }
 
-  if ($bestScore -ge 5) {
+  if ($bestScore -ge 12) {
     return $bestMatch
   }
 
@@ -421,6 +436,13 @@ function Test-LowSignalPoliticalDocument {
   )
 }
 
+function Test-WeakArticle {
+  param([string]$Text)
+
+  $haystack = $Text.ToLowerInvariant()
+  return $haystack -match "opinion|analysis:|explainer|what we know|what to know|factbox|live updates|newsletter|podcast"
+}
+
 function Get-SituationsFeed {
   $cachePath = Join-Path $cacheRoot "situations.json"
   if (Test-Path -LiteralPath $cachePath) {
@@ -457,7 +479,7 @@ function Get-SituationsFeed {
       $rawTitle = [string]$item.title
       $description = Strip-Html -Text ([string]$item.description)
       $text = "$rawTitle $description"
-      if (Test-LowSignalPoliticalDocument -Text $text) { continue }
+      if ((Test-LowSignalPoliticalDocument -Text $text) -or (Test-WeakArticle -Text $text)) { continue }
 
       $location = Get-MatchedLocation -Text $text -Locations $locations
       if ($null -eq $location) { continue }
@@ -466,6 +488,7 @@ function Get-SituationsFeed {
       $severity = Get-SeverityScore -Text $text
       if ($topic -eq "Developing Situation" -and $severity -lt 3) { continue }
       if ($topic -eq "Political Crisis" -and $severity -lt 2) { continue }
+      if (($topic -eq "Political Crisis" -or $topic -eq "Sanctions Pressure") -and $text -notmatch "crisis|resign|collapse|snap election|mass protest|sanction|embargo|asset freeze|blacklist|coup|unrest") { continue }
 
       $sourceLabel = "Google News"
       $title = $rawTitle
@@ -514,7 +537,11 @@ function Get-SituationsFeed {
       ForEach-Object {
         $_.timeline = @($_.timeline | Sort-Object { [datetimeoffset]::Parse($_.reportedAt) } -Descending | Select-Object -First 8)
         $_.sourceCount = @($_.timeline | Select-Object -ExpandProperty sourceLabel -Unique).Count
-        $_
+        if ($_.topic -eq "Political Crisis" -or $_.topic -eq "Sanctions Pressure") {
+          if ($_.timeline.Count -ge 2 -and $_.sourceCount -ge 2) { $_ }
+        } elseif ($_.timeline.Count -ge 2 -or $_.sourceCount -ge 2 -or ($_.severity -ge 4 -and $_.exactness -eq "exact")) {
+          $_
+        }
       } |
       Sort-Object severity -Descending |
       Select-Object -First 12

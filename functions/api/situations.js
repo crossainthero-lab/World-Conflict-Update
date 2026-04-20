@@ -112,6 +112,63 @@ const WEAK_LOCATION_WORDS = new Set([
   "pakistani"
 ]);
 
+const INCIDENT_TERMS = [
+  "airstrike",
+  "missile strike",
+  "strike",
+  "bombing",
+  "explosion",
+  "blast",
+  "shelling",
+  "drone",
+  "attack",
+  "raid",
+  "clash",
+  "fighting",
+  "killed",
+  "dead",
+  "fatal",
+  "protest",
+  "riot",
+  "unrest",
+  "border",
+  "incursion",
+  "pipeline",
+  "refinery",
+  "tanker"
+];
+
+const ATTRIBUTION_TERMS = [
+  "condemn",
+  "warn",
+  "urge",
+  "says",
+  "said",
+  "statement",
+  "minister",
+  "president",
+  "parliament",
+  "government",
+  "official",
+  "spokesperson",
+  "calls for",
+  "backs",
+  "supports",
+  "announces"
+];
+
+const WEAK_ARTICLE_TERMS = [
+  "opinion",
+  "analysis:",
+  "explainer",
+  "what we know",
+  "what to know",
+  "factbox",
+  "live updates",
+  "newsletter",
+  "podcast"
+];
+
 function stripHtml(text) {
   return decodeHtmlEntities(text).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -169,6 +226,7 @@ function filterRecentItems(items, maxAgeHours = 168) {
 function severityScore(text) {
   const haystack = text.toLowerCase();
   if (/(congress|senate|house committee|hearing|bill|resolution|lawmakers)/.test(haystack) && !/(attack|strike|killed|dead|fatal|protest|sanction|oil|pipeline|missile|drone|border|troop|deployment|assassinat)/.test(haystack)) return 1;
+  if (/(condemn|warn|urge|call for|calls for|says|said|statement|responds|reaction|backs|supports)/.test(haystack) && !/(in|near|at|over)\s+[a-z .'-]{2,40}\s+(?:after|as|when|following)?\s*(?:attack|strike|airstrike|bombing|explosion|blast|shelling|protest|riot)/.test(haystack)) return 1;
   if (/(nuclear|nuke|assassinat|massacre|mass casualty|hundreds killed|chemical weapon)/.test(haystack)) return 5;
   if (/(killed|dead|fatal|airstrike|bombing|explosion|missile strike|major attack)/.test(haystack)) return 4;
   if (/(missile|drone|shelling|strike|attack|raid|blast|retaliation|clash|troop|military|intercept|deployment|warning)/.test(haystack)) return 3;
@@ -184,31 +242,49 @@ function isLowSignalPoliticalDocument(text) {
   );
 }
 
+function isWeakArticle(text) {
+  const haystack = text.toLowerCase();
+  return WEAK_ARTICLE_TERMS.some((term) => haystack.includes(term));
+}
+
+function countTermProximity(haystack, keyword, terms, radius = 80) {
+  const index = haystack.indexOf(keyword);
+  if (index < 0) return 0;
+  const start = Math.max(0, index - radius);
+  const end = Math.min(haystack.length, index + keyword.length + radius);
+  const window = haystack.slice(start, end);
+  return terms.reduce((count, term) => count + (window.includes(term) ? 1 : 0), 0);
+}
+
+function hasIncidentPreposition(haystack, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b(?:in|near|at|over|around|outside|inside|across)\\s+(?:the\\s+)?${escaped}\\b`, "i").test(haystack);
+}
+
+function hasActorAttribution(haystack, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b.{0,50}\\b(?:${ATTRIBUTION_TERMS.join("|")})\\b|\\b(?:${ATTRIBUTION_TERMS.join("|")})\\b.{0,50}\\b${escaped}\\b`, "i").test(haystack);
+}
+
 function findLocation(text, locations) {
   const haystack = text.toLowerCase();
-  const rankedLocations = [...locations].sort((a, b) => {
-    if (a.exactness !== b.exactness) {
-      return a.exactness === "exact" ? -1 : 1;
-    }
-
-    const longestA = Math.max(...a.keywords.map((keyword) => keyword.length));
-    const longestB = Math.max(...b.keywords.map((keyword) => keyword.length));
-    return longestB - longestA;
-  });
-
   let bestMatch = null;
   let bestScore = 0;
 
-  for (const location of rankedLocations) {
+  for (const location of locations) {
     for (const keyword of location.keywords) {
       const normalizedKeyword = keyword.toLowerCase();
       const pattern = new RegExp(`(^|[^a-z])${normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z]|$)`, "i");
 
       if (pattern.test(haystack)) {
         let score = normalizedKeyword.length;
-        if (location.exactness === "exact") score += 15;
-        if (location.country && normalizedKeyword === location.country.toLowerCase()) score += 10;
+        if (location.exactness === "exact") score += 18;
+        if (hasIncidentPreposition(haystack, normalizedKeyword)) score += 22;
+        score += countTermProximity(haystack, normalizedKeyword, INCIDENT_TERMS) * 9;
+        score -= countTermProximity(haystack, normalizedKeyword, ATTRIBUTION_TERMS) * 11;
+        if (location.country && normalizedKeyword === location.country.toLowerCase()) score += 4;
         if (WEAK_LOCATION_WORDS.has(normalizedKeyword)) score -= 12;
+        if (hasActorAttribution(haystack, normalizedKeyword)) score -= 25;
 
         if (score > bestScore) {
           bestScore = score;
@@ -218,7 +294,7 @@ function findLocation(text, locations) {
     }
   }
 
-  return bestScore >= 5 ? bestMatch : null;
+  return bestScore >= 12 ? bestMatch : null;
 }
 
 function getCountryName(location) {
@@ -342,7 +418,7 @@ function buildSituationGroups(items, locations) {
 
   items.forEach((item) => {
     const text = `${item.title} ${item.description}`;
-    if (isLowSignalPoliticalDocument(text)) {
+    if (isLowSignalPoliticalDocument(text) || isWeakArticle(text)) {
       return;
     }
 
@@ -355,6 +431,9 @@ function buildSituationGroups(items, locations) {
       return;
     }
     if (topic.label === "Political Crisis" && severity < 2) {
+      return;
+    }
+    if (["Political Crisis", "Sanctions Pressure"].includes(topic.label) && !/(crisis|resign|collapse|snap election|mass protest|sanction|embargo|asset freeze|blacklist|coup|unrest)/i.test(text)) {
       return;
     }
 
@@ -406,7 +485,13 @@ function buildSituationGroups(items, locations) {
         confidence: group.exactness === "exact" ? 4 : 3
       };
     })
-    .filter((group) => group.timeline.length >= 1)
+    .filter((group) => {
+      const uniqueSources = new Set(group.timeline.map((item) => item.sourceLabel));
+      if (group.topic === "Political Crisis" || group.topic === "Sanctions Pressure") {
+        return group.timeline.length >= 2 && uniqueSources.size >= 2;
+      }
+      return group.timeline.length >= 2 || uniqueSources.size >= 2 || (group.severity >= 4 && group.exactness === "exact");
+    })
     .sort((a, b) => {
       return Date.parse(b.latestAt) - Date.parse(a.latestAt);
     })
