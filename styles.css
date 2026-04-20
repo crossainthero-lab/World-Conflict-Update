@@ -441,6 +441,34 @@ input[type="range"] {
   margin: 0;
 }
 
+.situation-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.situation-filters label {
+  display: grid;
+  gap: 6px;
+}
+
+.situation-filters span {
+  color: var(--accent);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.situation-filters select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: #0b1729;
+}
+
 .situations-layout {
   display: grid;
   grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
@@ -723,6 +751,10 @@ input[type="range"] {
   }
 
   .situations-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .situation-filters {
     grid-template-columns: 1fr;
   }
 

@@ -26,6 +26,10 @@ const situationsList = document.getElementById("situationsList");
 const timelineTitle = document.getElementById("timelineTitle");
 const timelineMeta = document.getElementById("timelineMeta");
 const timelineList = document.getElementById("timelineList");
+const situationSeverityFilter = document.getElementById("situationSeverityFilter");
+const situationUpdatesFilter = document.getElementById("situationUpdatesFilter");
+const situationSourcesFilter = document.getElementById("situationSourcesFilter");
+const situationSortFilter = document.getElementById("situationSortFilter");
 
 let conflicts = [];
 let activeConflictId = "";
@@ -40,6 +44,50 @@ let tileLayer;
 let autoRefreshTimer;
 let sourceFilter = "all";
 let userRefreshIntervalSeconds = Number(refreshIntervalSelect.value);
+
+const COUNTRY_FLAG_RULES = [
+  { flag: "\ud83c\udde7\ud83c\uddec", names: ["bulgaria", "bulgarian", "sofia"] },
+  { flag: "\ud83c\uddf7\ud83c\uddfa", names: ["russia", "russian", "moscow", "kremlin"] },
+  { flag: "\ud83c\uddfa\ud83c\udde6", names: ["ukraine", "ukrainian", "kyiv", "kiev"] },
+  { flag: "\ud83c\uddee\ud83c\uddf1", names: ["israel", "israeli", "tel aviv", "jerusalem"] },
+  { flag: "\ud83c\uddf5\ud83c\uddf8", names: ["palestine", "palestinian", "gaza", "rafah", "west bank"] },
+  { flag: "\ud83c\uddee\ud83c\uddf7", names: ["iran", "iranian", "tehran"] },
+  { flag: "\ud83c\uddfa\ud83c\uddf8", names: ["united states", "usa", "u.s.", "american", "washington"] },
+  { flag: "\ud83c\uddec\ud83c\udde7", names: ["united kingdom", "uk", "britain", "british", "england", "london"] },
+  { flag: "\ud83c\udde8\ud83c\uddf3", names: ["china", "beijing"] },
+  { flag: "\ud83c\uddf9\ud83c\uddfc", names: ["taiwan", "taipei"] },
+  { flag: "\ud83c\uddf0\ud83c\uddf5", names: ["north korea", "pyongyang"] },
+  { flag: "\ud83c\uddf0\ud83c\uddf7", names: ["south korea", "seoul"] },
+  { flag: "\ud83c\uddf8\ud83c\uddfe", names: ["syria", "syrian", "damascus"] },
+  { flag: "\ud83c\uddf1\ud83c\udde7", names: ["lebanon", "lebanese", "beirut", "hezbollah"] },
+  { flag: "\ud83c\uddfe\ud83c\uddea", names: ["yemen", "yemeni", "sanaa", "houthi"] },
+  { flag: "\ud83c\uddee\ud83c\uddf6", names: ["iraq", "iraqi", "baghdad"] },
+  { flag: "\ud83c\uddf5\ud83c\uddf0", names: ["pakistan", "pakistani", "islamabad"] },
+  { flag: "\ud83c\uddee\ud83c\uddf3", names: ["india", "indian", "new delhi"] },
+  { flag: "\ud83c\uddf8\ud83c\udde9", names: ["sudan", "sudanese", "khartoum", "darfur"] },
+  { flag: "\ud83c\uddf2\ud83c\uddf2", names: ["myanmar", "burma"] },
+  { flag: "\ud83c\uddfb\ud83c\uddea", names: ["venezuela", "venezuelan", "caracas"] },
+  { flag: "\ud83c\uddf5\ud83c\uddf1", names: ["poland", "polish", "warsaw"] },
+  { flag: "\ud83c\uddf7\ud83c\uddf4", names: ["romania", "romanian", "bucharest"] },
+  { flag: "\ud83c\uddf2\ud83c\udde9", names: ["moldova", "moldovan", "chisinau"] },
+  { flag: "\ud83c\uddf9\ud83c\uddf7", names: ["turkey", "turkish", "ankara", "istanbul"] }
+];
+
+function withCountryFlags(title) {
+  const cleanTitle = `${title || ""}`.trim();
+  const lowerTitle = cleanTitle.toLowerCase();
+  const flags = COUNTRY_FLAG_RULES
+    .filter((rule) => {
+      if (cleanTitle.includes(rule.flag)) return false;
+      return rule.names.some((name) => {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, "i").test(lowerTitle);
+      });
+    })
+    .map((rule) => rule.flag);
+
+  return [...new Set(flags), cleanTitle].filter(Boolean).join(" ");
+}
 
 function setMobileView(view) {
   document.body.dataset.mobileView = view;
@@ -122,7 +170,7 @@ function getFilteredEvents() {
 function buildPopup(event) {
   return `
     <div>
-      <h3 class="popup-title">${event.title}</h3>
+      <h3 class="popup-title">${withCountryFlags(event.title)}</h3>
       <p class="popup-copy">${event.description}</p>
       <p class="popup-copy"><strong>${event.locationName}</strong> | Severity ${event.severity}/5 | Confidence ${event.confidence}/5</p>
       <p class="popup-copy">${event.exactness === "exact" ? "Exact marker" : "Approximate marker"} | ${event.category}</p>
@@ -161,7 +209,7 @@ function buildClusterPopup(group) {
     .map((event) => {
       return `
         <article class="cluster-item">
-          <strong>${event.title}</strong>
+          <strong>${withCountryFlags(event.title)}</strong>
           <span>${formatTime(event.reportedAt)} | Confidence ${event.confidence}/5</span>
           <a href="${event.sourceUrl}" target="_blank" rel="noreferrer">${event.sourceLabel}</a>
         </article>
@@ -368,7 +416,7 @@ function renderEventList(events) {
       confidencePill.style.background = `${confidenceColor(event.confidence)}22`;
       confidencePill.style.color = confidenceColor(event.confidence);
 
-      title.textContent = event.title;
+      title.textContent = withCountryFlags(event.title);
       description.textContent = event.description;
       location.textContent = `${event.locationName} | ${formatTime(event.reportedAt)}`;
 
@@ -404,6 +452,40 @@ function getActiveSituation() {
   return situations.find((situation) => situation.id === activeSituationId);
 }
 
+function getSituationUpdateCount(situation) {
+  return situation.updateCount || situation.timeline?.length || 0;
+}
+
+function getSituationSourceCount(situation) {
+  return situation.sourceCount || 0;
+}
+
+function getSituationTime(situation) {
+  return Date.parse(situation.latestAt) || 0;
+}
+
+function getFilteredSituations() {
+  const minimumSeverity = Number(situationSeverityFilter.value);
+  const minimumUpdates = Number(situationUpdatesFilter.value);
+  const minimumSources = Number(situationSourcesFilter.value);
+  const sortBy = situationSortFilter.value;
+
+  return situations
+    .filter((situation) => {
+      return (
+        situation.severity >= minimumSeverity &&
+        getSituationUpdateCount(situation) >= minimumUpdates &&
+        getSituationSourceCount(situation) >= minimumSources
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === "severity") return b.severity - a.severity || getSituationTime(b) - getSituationTime(a);
+      if (sortBy === "updates") return getSituationUpdateCount(b) - getSituationUpdateCount(a);
+      if (sortBy === "sources") return getSituationSourceCount(b) - getSituationSourceCount(a);
+      return getSituationTime(b) - getSituationTime(a);
+    });
+}
+
 function findSituationById(situationId) {
   for (const entry of situations) {
     if (entry.id === situationId) return entry;
@@ -423,11 +505,11 @@ function renderSituationTimeline(situation) {
     return;
   }
 
-  timelineTitle.textContent = situation.title;
+  timelineTitle.textContent = withCountryFlags(situation.title);
   timelineMeta.textContent =
     situation.type === "group"
-      ? `${situation.countryName} | ${situation.situations.length} situations | ${situation.sourceCount} sources`
-      : `${situation.locationName} | Severity ${situation.severity}/5 | ${situation.sourceCount} sources`;
+      ? `${situation.countryName} | ${situation.situations.length} situations | ${getSituationSourceCount(situation)} sources`
+      : `${situation.locationName} | Severity ${situation.severity}/5 | ${getSituationSourceCount(situation)} sources`;
 
   situation.timeline.forEach((item) => {
     const article = document.createElement("article");
@@ -438,7 +520,7 @@ function renderSituationTimeline(situation) {
 
     article.className = "timeline-item";
     time.textContent = `${formatRelativeTime(item.reportedAt)} | ${item.sourceLabel}`;
-    title.textContent = item.title;
+    title.textContent = withCountryFlags(item.title);
     description.textContent = item.description;
     source.href = item.sourceUrl;
     source.target = "_blank";
@@ -469,14 +551,14 @@ function selectSituation(situationId, focusMap = true) {
     L.popup()
       .setLatLng(situation.coords)
       .setContent(
-        `<h3 class="popup-title">${situation.title}</h3><p class="popup-copy">${situation.timeline.length} timeline updates | Severity ${situation.severity}/5</p>`
+        `<h3 class="popup-title">${withCountryFlags(situation.title)}</h3><p class="popup-copy">${situation.timeline.length} timeline updates | Severity ${situation.severity}/5</p>`
       )
       .openOn(map);
   }
 }
 
 function renderSituationGroup(group) {
-  timelineTitle.textContent = group.title;
+  timelineTitle.textContent = withCountryFlags(group.title);
   timelineMeta.textContent = `${group.countryName} | ${group.situations.length} detected situations | ${group.sourceCount} sources`;
   timelineList.innerHTML = "";
 
@@ -488,7 +570,7 @@ function renderSituationGroup(group) {
 
     button.type = "button";
     button.className = "situation-card nested";
-    title.textContent = situation.title;
+    title.textContent = withCountryFlags(situation.title);
     meta.textContent = `${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
     latest.textContent = `Latest ${formatRelativeTime(situation.latestAt)}`;
     button.append(title, meta, latest);
@@ -520,8 +602,9 @@ function selectSituationEntry(entryId, focusMap = true) {
 }
 
 function renderSituations() {
+  const visibleSituations = getFilteredSituations();
   situationsList.innerHTML = "";
-  situationCount.textContent = String(situations.length);
+  situationCount.textContent = `${visibleSituations.length}/${situations.length}`;
 
   if (!situations.length) {
     situationsList.innerHTML =
@@ -530,7 +613,16 @@ function renderSituations() {
     return;
   }
 
-  situations.forEach((situation) => {
+  if (!visibleSituations.length) {
+    situationsList.innerHTML =
+      '<p class="event-description">No situations match those severity, update, and source filters.</p>';
+    activeSituationGroupId = "";
+    activeSituationId = "";
+    renderSituationTimeline(null);
+    return;
+  }
+
+  visibleSituations.forEach((situation) => {
     const button = document.createElement("button");
     const title = document.createElement("strong");
     const meta = document.createElement("span");
@@ -539,11 +631,11 @@ function renderSituations() {
     button.type = "button";
     button.className = "situation-card";
     button.dataset.situationId = situation.id;
-    title.textContent = situation.title;
+    title.textContent = withCountryFlags(situation.title);
     meta.textContent =
       situation.type === "group"
-        ? `${situation.situations.length} situations | ${situation.updateCount || situation.timeline.length} updates | ${situation.sourceCount} sources`
-        : `${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
+        ? `${situation.situations.length} situations | ${getSituationUpdateCount(situation)} updates | ${getSituationSourceCount(situation)} sources`
+        : `${situation.topic} | Severity ${situation.severity}/5 | ${getSituationUpdateCount(situation)} updates | ${getSituationSourceCount(situation)} sources`;
     latest.textContent = `Latest ${formatRelativeTime(situation.latestAt)}`;
 
     button.append(title, meta, latest);
@@ -551,8 +643,8 @@ function renderSituations() {
     situationsList.appendChild(button);
   });
 
-  if (!activeSituationGroupId || !situations.some((situation) => situation.id === activeSituationGroupId)) {
-    activeSituationGroupId = situations[0].id;
+  if (!activeSituationGroupId || !visibleSituations.some((situation) => situation.id === activeSituationGroupId)) {
+    activeSituationGroupId = visibleSituations[0].id;
   }
 
   selectSituationEntry(activeSituationGroupId, false);
@@ -585,7 +677,9 @@ function updateView(focusMap = false) {
   const activeConflict = getActiveConflict();
   const events = getFilteredEvents();
 
-  activeConflictTitle.textContent = activeConflict?.title || "World Conflict Update";
+  activeConflictTitle.textContent = activeConflict
+    ? withCountryFlags(activeConflict.title)
+    : "World Conflict Update";
   activeConflictSummary.textContent = activeConflict?.summary || "";
   severityValue.textContent = `${severityInput.value}+`;
   confidenceValue.textContent = `${confidenceInput.value}+`;
@@ -721,6 +815,10 @@ refreshButton.addEventListener("click", () => {
   loadFeed(false);
   loadSituations();
 });
+situationSeverityFilter.addEventListener("change", () => renderSituations());
+situationUpdatesFilter.addEventListener("change", () => renderSituations());
+situationSourcesFilter.addEventListener("change", () => renderSituations());
+situationSortFilter.addEventListener("change", () => renderSituations());
 sourceControls.addEventListener("click", (event) => {
   const button = event.target.closest(".source-button");
   if (!button) return;

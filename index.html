@@ -154,6 +154,45 @@
           <p id="situationsStatus" class="overlay-copy">
             Scanning recent news for emerging timelines.
           </p>
+          <div class="situation-filters">
+            <label>
+              <span>Min Severity</span>
+              <select id="situationSeverityFilter">
+                <option value="1">1+</option>
+                <option value="2">2+</option>
+                <option value="3">3+</option>
+                <option value="4">4+</option>
+                <option value="5">5 only</option>
+              </select>
+            </label>
+            <label>
+              <span>Min Updates</span>
+              <select id="situationUpdatesFilter">
+                <option value="1">1+</option>
+                <option value="2">2+</option>
+                <option value="3">3+</option>
+                <option value="5">5+</option>
+              </select>
+            </label>
+            <label>
+              <span>Min Sources</span>
+              <select id="situationSourcesFilter">
+                <option value="1">1+</option>
+                <option value="2">2+</option>
+                <option value="3">3+</option>
+                <option value="5">5+</option>
+              </select>
+            </label>
+            <label>
+              <span>Rank By</span>
+              <select id="situationSortFilter">
+                <option value="latest">Latest</option>
+                <option value="severity">Severity</option>
+                <option value="updates">Updates</option>
+                <option value="sources">Sources</option>
+              </select>
+            </label>
+          </div>
           <div class="situations-layout">
             <div id="situationsList" class="situations-list"></div>
             <div class="timeline-panel">
