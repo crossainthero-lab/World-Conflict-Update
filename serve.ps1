@@ -225,9 +225,10 @@ function Get-MatchedLocation {
   )
 
   $haystack = $Text.ToLowerInvariant()
-  $weakWords = @("chinese", "russian", "american", "israeli", "iranian", "ukrainian", "lebanese", "british", "turkish", "indian", "pakistani")
+  $weakWords = @("chinese", "russian", "american", "israeli", "iranian", "ukrainian", "lebanese", "british", "turkish", "indian", "pakistani", "u.s.", "usa", "us military", "united states")
   $incidentTerms = @("airstrike", "missile strike", "strike", "bombing", "explosion", "blast", "shelling", "drone", "attack", "raid", "clash", "fighting", "killed", "dead", "fatal", "protest", "riot", "unrest", "border", "incursion", "pipeline", "refinery", "tanker")
-  $attributionTerms = @("condemn", "warn", "urge", "says", "said", "statement", "minister", "president", "parliament", "government", "official", "spokesperson", "calls for", "backs", "supports", "announces")
+  $attributionTerms = @("condemn", "warn", "urge", "says", "said", "statement", "minister", "president", "parliament", "government", "official", "spokesperson", "calls for", "claim", "claims", "claimed", "backs", "supports", "announces")
+  $militaryAssetTerms = @("warship", "destroyer", "carrier", "vessel", "ship", "base", "troops", "forces", "soldiers", "navy", "military", "aircraft", "jet", "drone", "missile")
   $bestMatch = $null
   $bestScore = 0
 
@@ -248,6 +249,9 @@ function Get-MatchedLocation {
         }
         foreach ($term in $attributionTerms) {
           if ($window.Contains($term)) { $score -= 11 }
+        }
+        foreach ($term in $militaryAssetTerms) {
+          if ($window.Contains($term) -and $location.exactness -ne "exact" -and $haystack -notmatch "\b(in|near|at|over|around|outside|inside|across)\s+(the\s+)?$([regex]::Escape($normalizedKeyword))\b") { $score -= 35; break }
         }
         $attributionPattern = "\b$([regex]::Escape($normalizedKeyword))\b.{0,50}\b($($attributionTerms -join '|'))\b|\b($($attributionTerms -join '|'))\b.{0,50}\b$([regex]::Escape($normalizedKeyword))\b"
         if ($haystack -match $attributionPattern) { $score -= 25 }

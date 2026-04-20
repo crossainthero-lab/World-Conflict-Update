@@ -109,7 +109,11 @@ const WEAK_LOCATION_WORDS = new Set([
   "british",
   "turkish",
   "indian",
-  "pakistani"
+  "pakistani",
+  "u.s.",
+  "usa",
+  "us military",
+  "united states"
 ]);
 
 const INCIDENT_TERMS = [
@@ -152,9 +156,30 @@ const ATTRIBUTION_TERMS = [
   "official",
   "spokesperson",
   "calls for",
+  "claim",
+  "claims",
+  "claimed",
   "backs",
   "supports",
   "announces"
+];
+
+const MILITARY_ASSET_TERMS = [
+  "warship",
+  "destroyer",
+  "carrier",
+  "vessel",
+  "ship",
+  "base",
+  "troops",
+  "forces",
+  "soldiers",
+  "navy",
+  "military",
+  "aircraft",
+  "jet",
+  "drone",
+  "missile"
 ];
 
 const WEAK_ARTICLE_TERMS = [
@@ -266,6 +291,10 @@ function hasActorAttribution(haystack, keyword) {
   return new RegExp(`\\b${escaped}\\b.{0,50}\\b(?:${ATTRIBUTION_TERMS.join("|")})\\b|\\b(?:${ATTRIBUTION_TERMS.join("|")})\\b.{0,50}\\b${escaped}\\b`, "i").test(haystack);
 }
 
+function hasMilitaryAssetNear(haystack, keyword) {
+  return countTermProximity(haystack, keyword, MILITARY_ASSET_TERMS, 35) > 0;
+}
+
 function findLocation(text, locations) {
   const haystack = text.toLowerCase();
   let bestMatch = null;
@@ -284,6 +313,7 @@ function findLocation(text, locations) {
         score -= countTermProximity(haystack, normalizedKeyword, ATTRIBUTION_TERMS) * 11;
         if (location.country && normalizedKeyword === location.country.toLowerCase()) score += 4;
         if (WEAK_LOCATION_WORDS.has(normalizedKeyword)) score -= 12;
+        if (location.exactness !== "exact" && hasMilitaryAssetNear(haystack, normalizedKeyword) && !hasIncidentPreposition(haystack, normalizedKeyword)) score -= 35;
         if (hasActorAttribution(haystack, normalizedKeyword)) score -= 25;
 
         if (score > bestScore) {

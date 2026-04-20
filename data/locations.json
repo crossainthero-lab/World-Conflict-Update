@@ -57,6 +57,20 @@
       "keywords": ["iran", "iranian"]
     },
     {
+      "name": "Persian Gulf",
+      "country": "Iran",
+      "coords": [26.7500, 52.0000],
+      "exactness": "approximate",
+      "keywords": ["persian gulf", "arabian gulf", "gulf waters"]
+    },
+    {
+      "name": "Gulf of Oman",
+      "country": "Iran",
+      "coords": [24.7500, 58.0000],
+      "exactness": "approximate",
+      "keywords": ["gulf of oman", "oman gulf"]
+    },
+    {
       "name": "United States",
       "country": "United States",
       "coords": [39.8283, -98.5795],
@@ -476,6 +490,18 @@
       "coords": [26.5667, 56.2500],
       "exactness": "approximate",
       "keywords": ["strait of hormuz", "hormuz"]
+    },
+    {
+      "name": "Persian Gulf",
+      "coords": [26.7500, 52.0000],
+      "exactness": "approximate",
+      "keywords": ["persian gulf", "arabian gulf", "gulf waters"]
+    },
+    {
+      "name": "Gulf of Oman",
+      "coords": [24.7500, 58.0000],
+      "exactness": "approximate",
+      "keywords": ["gulf of oman", "oman gulf"]
     },
     {
       "name": "Red Sea region",
