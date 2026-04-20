@@ -53,7 +53,7 @@
   },
   {
     "id": "israel-gaza",
-    "title": "Israel-Gaza",
+    "title": "Israel/Palestine Conflict",
     "flags": "\ud83c\uddee\ud83c\uddf1 \ud83c\uddf5\ud83c\uddf8",
     "summary": "Tracks strikes, clashes, aid-route disruption, and major military developments in and around Gaza with confidence-ranked geography.",
     "focus": {
@@ -73,6 +73,30 @@
       "Israel Gaza border rocket drone attack when:2d",
       "West Bank Jenin Tulkarm raid clashes when:2d",
       "Gaza aid convoy humanitarian crossing Rafah Kerem Shalom when:2d"
+    ]
+  },
+  {
+    "id": "lebanon",
+    "title": "Lebanon",
+    "flags": "\ud83c\uddf1\ud83c\udde7 \ud83c\uddee\ud83c\uddf1",
+    "summary": "Tracks Lebanon-focused escalation, including Hezbollah-Israel border fire, strikes, displacement, political instability, and spillover from the wider regional conflict.",
+    "focus": {
+      "center": [33.75, 35.75],
+      "zoom": 8
+    },
+    "rssQuery": "Lebanon Hezbollah Israel border strike drone missile Beirut south Lebanon when:2d",
+    "gdeltQuery": "(Lebanon OR Lebanese OR Hezbollah OR Beirut OR \"southern Lebanon\" OR Tyre OR Sidon OR Nabatieh OR Baalbek OR Litani OR \"Blue Line\") (strike OR missile OR drone OR shelling OR attack OR clash OR displacement)",
+    "gdeltTimespan": "12h",
+    "sourceKeywords": ["lebanon", "lebanese", "hezbollah", "beirut", "tyre", "sidon", "nabatieh", "baalbek", "litani", "blue line", "southern lebanon", "south lebanon", "israel", "idf", "strike", "drone", "missile", "shelling", "attack", "clash"],
+    "refreshIntervalSeconds": 600,
+    "maxAgeHours": 36,
+    "rssQueries": [
+      "Lebanon Hezbollah Israel border strike shelling when:2d",
+      "southern Lebanon Israeli strike drone missile when:2d",
+      "Beirut Lebanon Hezbollah Israel escalation when:3d",
+      "Tyre Sidon Nabatieh Lebanon strike shelling when:3d",
+      "Baalbek Bekaa Lebanon Israeli strike Hezbollah when:3d",
+      "Lebanon displacement border villages Israel Hezbollah when:3d"
     ]
   },
   {

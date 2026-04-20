@@ -462,5 +462,73 @@
       "exactness": "approximate",
       "keywords": ["israel"]
     }
+  ],
+  "lebanon": [
+    {
+      "name": "Beirut, Lebanon",
+      "coords": [33.8938, 35.5018],
+      "exactness": "exact",
+      "keywords": ["beirut"]
+    },
+    {
+      "name": "Tyre, Lebanon",
+      "coords": [33.2705, 35.2038],
+      "exactness": "exact",
+      "keywords": ["tyre", "sour"]
+    },
+    {
+      "name": "Sidon, Lebanon",
+      "coords": [33.5571, 35.3715],
+      "exactness": "exact",
+      "keywords": ["sidon", "saida"]
+    },
+    {
+      "name": "Nabatieh, Lebanon",
+      "coords": [33.3772, 35.4838],
+      "exactness": "exact",
+      "keywords": ["nabatieh", "nabatiyeh"]
+    },
+    {
+      "name": "Baalbek, Lebanon",
+      "coords": [34.0058, 36.2181],
+      "exactness": "exact",
+      "keywords": ["baalbek", "bekaa", "beqaa"]
+    },
+    {
+      "name": "Marjayoun, Lebanon",
+      "coords": [33.3603, 35.5914],
+      "exactness": "exact",
+      "keywords": ["marjayoun", "marjeyoun"]
+    },
+    {
+      "name": "Bint Jbeil, Lebanon",
+      "coords": [33.1198, 35.4353],
+      "exactness": "exact",
+      "keywords": ["bint jbeil", "bint jbeil district"]
+    },
+    {
+      "name": "Kiryat Shmona, Israel",
+      "coords": [33.2073, 35.5721],
+      "exactness": "exact",
+      "keywords": ["kiryat shmona", "kiryat shemona"]
+    },
+    {
+      "name": "Metula, Israel",
+      "coords": [33.2792, 35.5795],
+      "exactness": "exact",
+      "keywords": ["metula"]
+    },
+    {
+      "name": "Southern Lebanon",
+      "coords": [33.25, 35.45],
+      "exactness": "approximate",
+      "keywords": ["southern lebanon", "south lebanon", "border villages", "blue line", "litani"]
+    },
+    {
+      "name": "Lebanon",
+      "coords": [33.8547, 35.8623],
+      "exactness": "approximate",
+      "keywords": ["lebanon", "lebanese", "hezbollah"]
+    }
   ]
 }
