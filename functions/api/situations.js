@@ -98,6 +98,34 @@ const COUNTRY_FLAGS = {
   "United Kingdom": "\ud83c\uddec\ud83c\udde7"
 };
 
+const COUNTRY_ALIASES = {
+  Bulgaria: ["bulgaria", "bulgarian"],
+  Russia: ["russia", "russian", "moscow", "kremlin"],
+  Ukraine: ["ukraine", "ukrainian", "kyiv", "kiev"],
+  Israel: ["israel", "israeli", "idf"],
+  Palestine: ["palestine", "palestinian", "gaza", "hamas", "west bank"],
+  Iran: ["iran", "iranian", "tehran"],
+  "United States": ["united states", "u.s.", "usa", "us protest", "us protests", "us protesters", "us demonstrators", "us navy", "us military", "american", "washington"],
+  China: ["china", "chinese", "beijing"],
+  Taiwan: ["taiwan", "taiwanese", "taipei"],
+  "North Korea": ["north korea", "pyongyang"],
+  "South Korea": ["south korea", "seoul"],
+  Syria: ["syria", "syrian", "damascus"],
+  Lebanon: ["lebanon", "lebanese", "hezbollah", "beirut"],
+  Yemen: ["yemen", "yemeni", "houthi", "sanaa", "sana'a"],
+  Iraq: ["iraq", "iraqi", "baghdad"],
+  Pakistan: ["pakistan", "pakistani", "islamabad"],
+  India: ["india", "indian", "new delhi"],
+  Sudan: ["sudan", "sudanese", "khartoum", "darfur"],
+  Myanmar: ["myanmar", "burma"],
+  Venezuela: ["venezuela", "venezuelan", "caracas"],
+  Poland: ["poland", "polish", "warsaw"],
+  Romania: ["romania", "romanian", "bucharest"],
+  Moldova: ["moldova", "moldovan", "chisinau", "transnistria"],
+  Turkey: ["turkey", "turkish", "ankara", "istanbul"],
+  "United Kingdom": ["united kingdom", "u.k.", "uk ", "britain", "british", "london"]
+};
+
 const WEAK_LOCATION_WORDS = new Set([
   "chinese",
   "russian",
@@ -295,6 +323,11 @@ function hasPoliticalSubjectAnchor(haystack, keyword) {
   return new RegExp(`\\b${escaped}\\b.{0,80}\\b(?:election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\\b|\\b(?:election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\\b.{0,80}\\b${escaped}\\b`, "i").test(haystack);
 }
 
+function hasSubjectOnlyPreposition(haystack, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b(?:about|against|over|toward|towards|concerning|regarding)\\s+(?:the\\s+)?${escaped}\\b`, "i").test(haystack);
+}
+
 function hasHeadlineMention(haystack, keyword) {
   return haystack.slice(0, 140).includes(keyword);
 }
@@ -323,10 +356,11 @@ function findLocation(text, locations) {
         const politicalSubjectAnchor = hasPoliticalSubjectAnchor(haystack, normalizedKeyword);
         const actorAttribution = hasActorAttribution(haystack, normalizedKeyword);
         const militaryAssetMention = hasMilitaryAssetNear(haystack, normalizedKeyword);
+        const subjectOnlyMention = hasSubjectOnlyPreposition(haystack, normalizedKeyword);
         const weakCountryMention =
           isCountryScaleLocation(location) &&
           !explicitIncidentAnchor &&
-          (actorAttribution || militaryAssetMention || WEAK_LOCATION_WORDS.has(normalizedKeyword));
+          (actorAttribution || militaryAssetMention || subjectOnlyMention || WEAK_LOCATION_WORDS.has(normalizedKeyword));
 
         if (weakCountryMention) {
           continue;
@@ -361,6 +395,61 @@ function getCountryName(location) {
 
 function getCountryFlag(countryName) {
   return COUNTRY_FLAGS[countryName] || "";
+}
+
+function hasAlias(text, alias) {
+  const escaped = alias.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, "i").test(text);
+}
+
+function extractInvolvedCountries(text, location) {
+  const haystack = ` ${text.toLowerCase()} `;
+  const countries = new Set();
+
+  if (location) {
+    countries.add(getCountryName(location));
+  }
+
+  Object.entries(COUNTRY_ALIASES).forEach(([country, aliases]) => {
+    if (aliases.some((alias) => hasAlias(haystack, alias))) {
+      countries.add(country);
+    }
+  });
+
+  return [...countries].sort();
+}
+
+function findCountryLocation(countryName, locations) {
+  return locations.find((location) => location.country === countryName && location.name === countryName);
+}
+
+function fallbackMultiCountryLocation(involvedCountries, locations) {
+  const countryLocations = involvedCountries
+    .map((country) => findCountryLocation(country, locations))
+    .filter(Boolean);
+
+  if (!countryLocations.length) return null;
+
+  const coords = countryLocations.reduce(
+    (sum, location) => [sum[0] + location.coords[0], sum[1] + location.coords[1]],
+    [0, 0]
+  );
+
+  return {
+    name: formatCountrySet(involvedCountries),
+    country: formatCountrySet(involvedCountries),
+    coords: [coords[0] / countryLocations.length, coords[1] / countryLocations.length],
+    exactness: "approximate",
+    keywords: []
+  };
+}
+
+function formatCountrySet(countries) {
+  return countries.join(" / ");
+}
+
+function formatCountryFlags(countries) {
+  return countries.map(getCountryFlag).filter(Boolean).join(" ");
 }
 
 function detectTopic(text) {
@@ -480,11 +569,18 @@ function buildSituationGroups(items, locations) {
       return;
     }
 
-    const location = findLocation(text, locations);
-    if (!location) return;
-
     const topic = detectTopic(text);
     const severity = severityScore(text);
+    let location = findLocation(text, locations);
+    const involvedCountries = extractInvolvedCountries(text, location);
+    if (!location && involvedCountries.length >= 2) {
+      location = fallbackMultiCountryLocation(involvedCountries, locations);
+    }
+    if (!location) return;
+
+    const involvedCountryName = formatCountrySet(involvedCountries);
+    const involvedFlags = formatCountryFlags(involvedCountries);
+
     if (topic.label === "Developing Situation" && severity < 3) {
       return;
     }
@@ -495,13 +591,16 @@ function buildSituationGroups(items, locations) {
       return;
     }
 
-    const groupKey = `${location.name}|${topic.label}`;
+    const groupKey = `${involvedCountryName}|${location.name}|${topic.label}`;
     const group = groups.get(groupKey) || {
       id: groupKey.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
       countryName: getCountryName(location),
       countryFlag: getCountryFlag(getCountryName(location)),
-      title: `${getCountryFlag(getCountryName(location))} ${location.name} ${topic.label}`.trim(),
+      involvedCountries,
+      involvedFlags,
+      title: `${involvedFlags || getCountryFlag(getCountryName(location))} ${involvedCountryName || location.name} ${topic.label}`.trim(),
       locationName: location.name,
+      primaryLocationName: location.name,
       coords: location.coords,
       exactness: location.exactness,
       topic: topic.label,
@@ -523,7 +622,9 @@ function buildSituationGroups(items, locations) {
       sourceLabel: item.sourceLabel,
       sourceUrl: item.sourceUrl,
       sourceType: item.sourceType,
-      severity
+      severity,
+      involvedCountries,
+      locationName: location.name
     });
 
     groups.set(groupKey, group);
@@ -557,13 +658,20 @@ function buildSituationGroups(items, locations) {
 
   const countryGroups = new Map();
   situations.forEach((situation) => {
-    const key = situation.countryName;
+    const key = situation.involvedCountries?.length
+      ? formatCountrySet(situation.involvedCountries)
+      : situation.countryName;
+    const flags = situation.involvedCountries?.length
+      ? formatCountryFlags(situation.involvedCountries)
+      : getCountryFlag(key);
     const group = countryGroups.get(key) || {
       id: `country-${key.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`,
       type: "group",
-      title: `${getCountryFlag(key)} ${key} Situation Group`.trim(),
+      title: `${flags} ${key} Situation Group`.trim(),
       countryName: key,
-      countryFlag: getCountryFlag(key),
+      countryFlag: flags,
+      involvedCountries: situation.involvedCountries || [situation.countryName],
+      involvedFlags: flags,
       locationName: key,
       coords: situation.coords,
       exactness: "approximate",
@@ -574,6 +682,9 @@ function buildSituationGroups(items, locations) {
     };
 
     group.situations.push(situation);
+    group.involvedCountries = [...new Set([...group.involvedCountries, ...(situation.involvedCountries || [])])].sort();
+    group.involvedFlags = formatCountryFlags(group.involvedCountries);
+    group.title = `${group.involvedFlags} ${formatCountrySet(group.involvedCountries)} Situation Group`.trim();
     group.severity = Math.max(group.severity, situation.severity);
     group.latestAt =
       Date.parse(situation.latestAt) > Date.parse(group.latestAt)

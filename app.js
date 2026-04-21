@@ -464,6 +464,12 @@ function getSituationTime(situation) {
   return Date.parse(situation.latestAt) || 0;
 }
 
+function getSituationCountryLabel(situation) {
+  return situation.involvedCountries?.length
+    ? situation.involvedCountries.join(" / ")
+    : situation.countryName || situation.locationName;
+}
+
 function getFilteredSituations() {
   const minimumSeverity = Number(situationSeverityFilter.value);
   const minimumUpdates = Number(situationUpdatesFilter.value);
@@ -508,8 +514,8 @@ function renderSituationTimeline(situation) {
   timelineTitle.textContent = withCountryFlags(situation.title);
   timelineMeta.textContent =
     situation.type === "group"
-      ? `${situation.countryName} | ${situation.situations.length} situations | ${getSituationSourceCount(situation)} sources`
-      : `${situation.locationName} | Severity ${situation.severity}/5 | ${getSituationSourceCount(situation)} sources`;
+      ? `Involved: ${getSituationCountryLabel(situation)} | ${situation.situations.length} situations | ${getSituationSourceCount(situation)} sources`
+      : `Involved: ${getSituationCountryLabel(situation)} | Marker: ${situation.locationName} | Severity ${situation.severity}/5 | ${getSituationSourceCount(situation)} sources`;
 
   situation.timeline.forEach((item) => {
     const article = document.createElement("article");
@@ -559,7 +565,7 @@ function selectSituation(situationId, focusMap = true) {
 
 function renderSituationGroup(group) {
   timelineTitle.textContent = withCountryFlags(group.title);
-  timelineMeta.textContent = `${group.countryName} | ${group.situations.length} detected situations | ${group.sourceCount} sources`;
+  timelineMeta.textContent = `Involved: ${getSituationCountryLabel(group)} | ${group.situations.length} detected situations | ${group.sourceCount} sources`;
   timelineList.innerHTML = "";
 
   group.situations.forEach((situation) => {
@@ -571,7 +577,7 @@ function renderSituationGroup(group) {
     button.type = "button";
     button.className = "situation-card nested";
     title.textContent = withCountryFlags(situation.title);
-    meta.textContent = `${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
+    meta.textContent = `Involved: ${getSituationCountryLabel(situation)} | Marker: ${situation.locationName} | ${situation.topic} | Severity ${situation.severity}/5 | ${situation.timeline.length} updates`;
     latest.textContent = `Latest ${formatRelativeTime(situation.latestAt)}`;
     button.append(title, meta, latest);
     button.addEventListener("click", () => selectSituation(situation.id));
@@ -634,8 +640,8 @@ function renderSituations() {
     title.textContent = withCountryFlags(situation.title);
     meta.textContent =
       situation.type === "group"
-        ? `${situation.situations.length} situations | ${getSituationUpdateCount(situation)} updates | ${getSituationSourceCount(situation)} sources`
-        : `${situation.topic} | Severity ${situation.severity}/5 | ${getSituationUpdateCount(situation)} updates | ${getSituationSourceCount(situation)} sources`;
+        ? `Involved: ${getSituationCountryLabel(situation)} | ${situation.situations.length} situations | ${getSituationUpdateCount(situation)} updates | ${getSituationSourceCount(situation)} sources`
+        : `Involved: ${getSituationCountryLabel(situation)} | ${situation.topic} | Severity ${situation.severity}/5 | ${getSituationUpdateCount(situation)} updates | ${getSituationSourceCount(situation)} sources`;
     latest.textContent = `Latest ${formatRelativeTime(situation.latestAt)}`;
 
     button.append(title, meta, latest);
