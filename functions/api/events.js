@@ -17,16 +17,26 @@ const NEWS_FEEDS = [
   { name: "France 24", url: "https://www.france24.com/en/rss" },
   { name: "DW News", url: "https://rss.dw.com/xml/rss-en-all" },
   { name: "UN News", url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml" },
-  { name: "Reuters World", url: "https://feeds.reuters.com/reuters/worldNews" },
   { name: "AP Top News", url: "https://apnews.com/hub/ap-top-news?output=rss" },
   { name: "Sky News World", url: "https://feeds.skynews.com/feeds/rss/world.xml" },
   { name: "CBS World", url: "https://www.cbsnews.com/latest/rss/world" },
   { name: "ABC News International", url: "https://abcnews.go.com/abcnews/internationalheadlines" },
-  { name: "CBC World", url: "https://www.cbc.ca/cmlink/rss-world" },
   { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" },
+  { name: "VOA News", url: "https://www.voanews.com/api/zmgqem" },
+  { name: "The Hill International", url: "https://thehill.com/policy/international/feed/" },
+  { name: "The Moscow Times", url: "https://www.themoscowtimes.com/rss/news" },
+  { name: "Meduza English", url: "https://meduza.io/rss/en/all" },
   { name: "RFE/RL Ukraine", url: "https://www.rferl.org/api/zrqiteuuir" },
   { name: "Kyiv Independent", url: "https://kyivindependent.com/news-archive/rss/" },
-  { name: "Ukrinform", url: "https://www.ukrinform.net/rss/block-lastnews" }
+  { name: "Ukrinform", url: "https://www.ukrinform.net/rss/block-lastnews" },
+  { name: "Euromaidan Press", url: "https://euromaidanpress.com/feed/" },
+  { name: "Militarnyi English", url: "https://militarnyi.com/en/feed/" },
+  { name: "Times of Israel", url: "https://www.timesofisrael.com/feed/" },
+  { name: "Jerusalem Post", url: "https://www.jpost.com/rss/rssfeedsheadlines.aspx" },
+  { name: "Middle East Eye", url: "https://www.middleeasteye.net/rss" },
+  { name: "The New Arab", url: "https://www.newarab.com/rss" },
+  { name: "Arab News", url: "https://www.arabnews.com/rss.xml" },
+  { name: "TRT World", url: "https://www.trtworld.com/rss" }
 ];
 
 function stripHtml(text) {
@@ -119,18 +129,37 @@ function normalizeGdeltDate(seenDate) {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-async function fetchGdeltDoc(query, timespan) {
+function createGdeltUrl(query, timespan) {
   const url = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
   url.searchParams.set("query", query);
   url.searchParams.set("mode", "artlist");
   url.searchParams.set("format", "json");
-  url.searchParams.set("maxrecords", "50");
+  url.searchParams.set("maxrecords", "25");
   url.searchParams.set("sort", "datedesc");
-  url.searchParams.set("timespan", timespan);
+  url.searchParams.set("timespan", timespan || "24h");
+  return url;
+}
+
+async function fetchGdeltDoc(query, timespan, context) {
+  const url = createGdeltUrl(query, timespan);
+  const cache = typeof caches !== "undefined" ? caches.default : null;
+  const cacheKey = new Request(`https://world-conflict-update.local/gdelt-doc?${url.searchParams.toString()}`);
+  const cachedResponse = cache ? await cache.match(cacheKey) : null;
+
+  if (cachedResponse) {
+    return {
+      ...(await cachedResponse.json()),
+      _cacheStatus: "hit"
+    };
+  }
 
   const response = await fetch(url.toString(), {
     headers: {
       "User-Agent": "WorldConflictUpdate/1.0 (+https://world-conflict-update.pages.dev)"
+    },
+    cf: {
+      cacheEverything: true,
+      cacheTtl: 1800
     }
   });
 
@@ -138,7 +167,21 @@ async function fetchGdeltDoc(query, timespan) {
     throw new Error(`GDELT DOC failed: ${response.status}`);
   }
 
-  return response.json();
+  const payload = await response.json();
+
+  if (cache) {
+    const responseToCache = Response.json(payload, {
+      headers: {
+        "Cache-Control": "public, max-age=1800"
+      }
+    });
+    context?.waitUntil?.(cache.put(cacheKey, responseToCache));
+  }
+
+  return {
+    ...payload,
+    _cacheStatus: "live"
+  };
 }
 
 const INCIDENT_TERMS = [
@@ -240,6 +283,11 @@ function hasPoliticalSubjectAnchor(haystack, keyword) {
   return new RegExp(`\\b${escaped}\\b.{0,80}\\b(?:election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\\b|\\b(?:election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\\b.{0,80}\\b${escaped}\\b`, "i").test(haystack);
 }
 
+function hasSubjectOnlyPreposition(haystack, keyword) {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b(?:about|against|over|toward|towards|concerning|regarding)\\s+(?:the\\s+)?${escaped}\\b`, "i").test(haystack);
+}
+
 function hasHeadlineMention(haystack, keyword) {
   return haystack.slice(0, 140).includes(keyword);
 }
@@ -269,10 +317,11 @@ function findLocation(text, locations) {
         const politicalSubjectAnchor = hasPoliticalSubjectAnchor(haystack, normalizedKeyword);
         const actorAttribution = hasActorAttribution(haystack, normalizedKeyword);
         const militaryAssetMention = hasMilitaryAssetNear(haystack, normalizedKeyword);
+        const subjectOnlyMention = hasSubjectOnlyPreposition(haystack, normalizedKeyword);
         const weakCountryMention =
           isCountryScaleLocation(location) &&
           !explicitIncidentAnchor &&
-          (actorAttribution || militaryAssetMention || WEAK_LOCATION_WORDS.has(normalizedKeyword));
+          (actorAttribution || militaryAssetMention || subjectOnlyMention || WEAK_LOCATION_WORDS.has(normalizedKeyword));
 
         if (weakCountryMention) {
           continue;
@@ -468,7 +517,6 @@ const MARKER_ACTION_TERMS = [
   "frontline",
   "border fire",
   "aid convoy",
-  "protest",
   "unrest",
   "sanction",
   "pipeline",
@@ -533,11 +581,15 @@ function getGoogleQueries(conflict) {
 }
 
 async function fetchRssFeed(feed) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6500);
+
   const response = await fetch(feed.url, {
+    signal: controller.signal,
     headers: {
       "User-Agent": "WorldConflictUpdate/1.0 (+https://world-conflict-update.pages.dev)"
     }
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     throw new Error(`${feed.name} RSS failed: ${response.status}`);
@@ -560,16 +612,11 @@ function toEvent(item, conflict, locations, index) {
 
   const location = findLocation(`${title} ${description}`, locations);
 
-  if (!location && conflict.id === "world-events") {
+  if (!location) {
     return null;
   }
 
-  const mappedLocation = location || {
-    name: `${conflict.title} region`,
-    coords: conflict.focus.center,
-    exactness: "approximate",
-    keywords: []
-  };
+  const mappedLocation = location;
 
   const severity = severityScore(`${title} ${description}`);
   const confidence = confidenceFromLocation(mappedLocation, title, description);
@@ -683,7 +730,7 @@ export async function onRequestGet(context) {
   try {
     const googleQueries = getGoogleQueries(conflict);
     const [gdeltResult, ...sourceResults] = await Promise.all([
-      getOptionalSource("GDELT DOC", () => fetchGdeltDoc(conflict.gdeltQuery, conflict.gdeltTimespan || "6h")),
+      getOptionalSource("GDELT DOC", () => fetchGdeltDoc(conflict.gdeltQuery, conflict.gdeltTimespan || "24h", context)),
       ...googleQueries.map((query) =>
         getOptionalSource(`Google News: ${query}`, () => fetchGoogleNewsRss(query))
       ),
@@ -737,6 +784,7 @@ export async function onRequestGet(context) {
     const failedSources = [gdeltResult, ...googleResults, ...publisherResults]
       .filter((result) => !result.ok)
       .map((result) => `${result.label}: ${result.error}`);
+    const gdeltCacheStatus = gdeltResult.ok ? gdeltResult.value?._cacheStatus : "failed";
 
     payload = {
       conflictId: conflict.id,
@@ -746,7 +794,9 @@ export async function onRequestGet(context) {
       lastFetchedAt: new Date().toISOString(),
       message: failedSources.length
         ? `Live events loaded with partial source failures: ${failedSources.join("; ")}`
-        : "Live events were refreshed from Google News, GDELT, and multiple publisher RSS feeds with recency filtering.",
+        : gdeltResult.ok
+          ? `Live events were refreshed from Google News, ${gdeltCacheStatus === "hit" ? "cached GDELT" : "live GDELT"}, and publisher RSS feeds with recency filtering.`
+          : "Live events were refreshed from Google News and publisher RSS. GDELT is still unavailable for this request.",
       events
     };
   } catch (error) {

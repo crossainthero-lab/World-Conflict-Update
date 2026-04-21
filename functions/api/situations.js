@@ -16,13 +16,25 @@ const NEWS_FEEDS = [
   { name: "France 24", url: "https://www.france24.com/en/rss" },
   { name: "DW News", url: "https://rss.dw.com/xml/rss-en-all" },
   { name: "UN News", url: "https://news.un.org/feed/subscribe/en/news/all/rss.xml" },
-  { name: "Reuters World", url: "https://feeds.reuters.com/reuters/worldNews" },
   { name: "AP Top News", url: "https://apnews.com/hub/ap-top-news?output=rss" },
   { name: "Sky News World", url: "https://feeds.skynews.com/feeds/rss/world.xml" },
   { name: "CBS World", url: "https://www.cbsnews.com/latest/rss/world" },
   { name: "ABC News International", url: "https://abcnews.go.com/abcnews/internationalheadlines" },
-  { name: "CBC World", url: "https://www.cbc.ca/cmlink/rss-world" },
-  { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" }
+  { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" },
+  { name: "VOA News", url: "https://www.voanews.com/api/zmgqem" },
+  { name: "The Hill International", url: "https://thehill.com/policy/international/feed/" },
+  { name: "The Moscow Times", url: "https://www.themoscowtimes.com/rss/news" },
+  { name: "Meduza English", url: "https://meduza.io/rss/en/all" },
+  { name: "Kyiv Independent", url: "https://kyivindependent.com/news-archive/rss/" },
+  { name: "Ukrinform", url: "https://www.ukrinform.net/rss/block-lastnews" },
+  { name: "Euromaidan Press", url: "https://euromaidanpress.com/feed/" },
+  { name: "Militarnyi English", url: "https://militarnyi.com/en/feed/" },
+  { name: "Times of Israel", url: "https://www.timesofisrael.com/feed/" },
+  { name: "Jerusalem Post", url: "https://www.jpost.com/rss/rssfeedsheadlines.aspx" },
+  { name: "Middle East Eye", url: "https://www.middleeasteye.net/rss" },
+  { name: "The New Arab", url: "https://www.newarab.com/rss" },
+  { name: "Arab News", url: "https://www.arabnews.com/rss.xml" },
+  { name: "TRT World", url: "https://www.trtworld.com/rss" }
 ];
 
 const SITUATION_QUERIES = [
@@ -419,31 +431,6 @@ function extractInvolvedCountries(text, location) {
   return [...countries].sort();
 }
 
-function findCountryLocation(countryName, locations) {
-  return locations.find((location) => location.country === countryName && location.name === countryName);
-}
-
-function fallbackMultiCountryLocation(involvedCountries, locations) {
-  const countryLocations = involvedCountries
-    .map((country) => findCountryLocation(country, locations))
-    .filter(Boolean);
-
-  if (!countryLocations.length) return null;
-
-  const coords = countryLocations.reduce(
-    (sum, location) => [sum[0] + location.coords[0], sum[1] + location.coords[1]],
-    [0, 0]
-  );
-
-  return {
-    name: formatCountrySet(involvedCountries),
-    country: formatCountrySet(involvedCountries),
-    coords: [coords[0] / countryLocations.length, coords[1] / countryLocations.length],
-    exactness: "approximate",
-    keywords: []
-  };
-}
-
 function formatCountrySet(countries) {
   return countries.join(" / ");
 }
@@ -528,11 +515,15 @@ async function fetchGoogleNewsRss(query) {
 }
 
 async function fetchRssFeed(feed) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6500);
+
   const response = await fetch(feed.url, {
+    signal: controller.signal,
     headers: {
       "User-Agent": "WorldConflictUpdate/1.0 (+https://world-conflict-update.pages.dev)"
     }
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     throw new Error(`${feed.name} RSS failed: ${response.status}`);
@@ -573,9 +564,6 @@ function buildSituationGroups(items, locations) {
     const severity = severityScore(text);
     let location = findLocation(text, locations);
     const involvedCountries = extractInvolvedCountries(text, location);
-    if (!location && involvedCountries.length >= 2) {
-      location = fallbackMultiCountryLocation(involvedCountries, locations);
-    }
     if (!location) return;
 
     const involvedCountryName = formatCountrySet(involvedCountries);

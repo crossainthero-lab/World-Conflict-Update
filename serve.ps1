@@ -240,6 +240,7 @@ function Get-MatchedLocation {
       if ($haystack -match $pattern) {
         $explicitIncidentAnchor = $haystack -match "\b(in|near|at|over|around|outside|inside|across)\s+(the\s+)?$([regex]::Escape($normalizedKeyword))\b"
         $politicalSubjectAnchor = $haystack -match "\b$([regex]::Escape($normalizedKeyword))\b.{0,80}\b(election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\b|\b(election|president|government|parliament|minister|coalition|vote|party|opposition|political|crisis)\b.{0,80}\b$([regex]::Escape($normalizedKeyword))\b"
+        $subjectOnlyMention = $haystack -match "\b(about|against|over|toward|towards|concerning|regarding)\s+(the\s+)?$([regex]::Escape($normalizedKeyword))\b"
         $headlineMention = $haystack.Substring(0, [Math]::Min(140, $haystack.Length)).Contains($normalizedKeyword)
         $isCountryScale = $location.PSObject.Properties["country"] -and $location.exactness -ne "exact" -and $location.country -eq $location.name
         $attributionPattern = "\b$([regex]::Escape($normalizedKeyword))\b.{0,50}\b($($attributionTerms -join '|'))\b|\b($($attributionTerms -join '|'))\b.{0,50}\b$([regex]::Escape($normalizedKeyword))\b"
@@ -263,7 +264,7 @@ function Get-MatchedLocation {
         foreach ($term in $militaryAssetTerms) {
           if ($window.Contains($term)) { $militaryAssetMention = $true; break }
         }
-        if ($isCountryScale -and -not $explicitIncidentAnchor -and ($actorAttribution -or $militaryAssetMention -or ($weakWords -contains $normalizedKeyword))) { continue }
+        if ($isCountryScale -and -not $explicitIncidentAnchor -and ($actorAttribution -or $militaryAssetMention -or $subjectOnlyMention -or ($weakWords -contains $normalizedKeyword))) { continue }
         if ($militaryAssetMention -and $location.exactness -ne "exact" -and -not $explicitIncidentAnchor) { $score -= 35 }
         if ($actorAttribution) { $score -= 25 }
         if ($location.PSObject.Properties["country"] -and $normalizedKeyword -eq $location.country.ToLowerInvariant()) { $score += 4 }
@@ -331,12 +332,7 @@ function Convert-RssItemToEvent {
   $location = Get-MatchedLocation -Text $combinedText -Locations $Locations
 
   if ($null -eq $location) {
-    $location = [PSCustomObject]@{
-      name = "$($Conflict.title) region"
-      coords = $Conflict.focus.center
-      exactness = "approximate"
-      keywords = @()
-    }
+    return $null
   }
 
   $sourceLabel = "Google News"
@@ -412,7 +408,7 @@ function Test-ConflictRelevance {
   $description = if ($Item.PSObject.Properties["normalizedDescription"]) { [string]$Item.normalizedDescription } else { [string]$Item.description }
   $text = "$title $description".ToLowerInvariant()
   $lowValueTerms = @("sports", "entertainment", "celebrity", "movie", "football", "basketball", "transfer", "stock market", "recipe")
-  $markerActionTerms = @("airstrike", "strike", "shelling", "missile", "drone", "attack", "clash", "clashes", "fighting", "killed", "dead", "injured", "explosion", "blast", "raid", "rocket", "intercept", "interception", "deployment", "deployed", "evacuation", "evacuated", "displacement", "displaced", "incursion", "frontline", "border fire", "aid convoy", "protest", "unrest", "sanction", "pipeline", "refinery", "tanker")
+  $markerActionTerms = @("airstrike", "strike", "shelling", "missile", "drone", "attack", "clash", "clashes", "fighting", "killed", "dead", "injured", "explosion", "blast", "raid", "rocket", "intercept", "interception", "deployment", "deployed", "evacuation", "evacuated", "displacement", "displaced", "incursion", "frontline", "border fire", "aid convoy", "unrest", "sanction", "pipeline", "refinery", "tanker")
 
   if (Test-IncludesAny -Text $text -Terms $lowValueTerms) {
     return $false
