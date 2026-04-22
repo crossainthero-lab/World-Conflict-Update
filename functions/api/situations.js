@@ -21,7 +21,6 @@ const NEWS_FEEDS = [
   { name: "CBS World", url: "https://www.cbsnews.com/latest/rss/world" },
   { name: "ABC News International", url: "https://abcnews.go.com/abcnews/internationalheadlines" },
   { name: "Euronews World", url: "https://www.euronews.com/rss?level=theme&name=news" },
-  { name: "VOA News", url: "https://www.voanews.com/api/zmgqem" },
   { name: "The Hill International", url: "https://thehill.com/policy/international/feed/" },
   { name: "The Moscow Times", url: "https://www.themoscowtimes.com/rss/news" },
   { name: "Meduza English", url: "https://meduza.io/rss/en/all" },
@@ -29,12 +28,9 @@ const NEWS_FEEDS = [
   { name: "Ukrinform", url: "https://www.ukrinform.net/rss/block-lastnews" },
   { name: "Euromaidan Press", url: "https://euromaidanpress.com/feed/" },
   { name: "Militarnyi English", url: "https://militarnyi.com/en/feed/" },
-  { name: "Times of Israel", url: "https://www.timesofisrael.com/feed/" },
   { name: "Jerusalem Post", url: "https://www.jpost.com/rss/rssfeedsheadlines.aspx" },
   { name: "Middle East Eye", url: "https://www.middleeasteye.net/rss" },
-  { name: "The New Arab", url: "https://www.newarab.com/rss" },
-  { name: "Arab News", url: "https://www.arabnews.com/rss.xml" },
-  { name: "TRT World", url: "https://www.trtworld.com/rss" }
+  { name: "Arab News", url: "https://www.arabnews.com/rss.xml" }
 ];
 
 const SITUATION_QUERIES = [
@@ -750,7 +746,8 @@ export async function onRequestGet(context) {
     const situations = buildSituationGroups(items, worldLocations);
     const failedSources = [...googleResults, ...publisherResults]
       .filter((result) => !result.ok)
-      .map((result) => `${result.label}: ${result.error}`);
+      .map((result) => `${result.label}: ${result.error}`)
+      .slice(0, 4);
 
     return Response.json(
       {
